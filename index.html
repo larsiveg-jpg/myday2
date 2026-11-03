@@ -53,6 +53,29 @@
     </div>
   </main>
 
+  <!-- HJEM -->
+  <main class="myday-view" id="v-hjem" hidden>
+    <section class="ds-card">
+      <div class="ds-card__block">
+        <div class="myday-row">
+          <h2 class="ds-heading" data-size="xs" id="homeStopName">Neste avganger</h2>
+          <a class="ds-link" href="#avganger" data-size="sm">Alle avganger</a>
+        </div>
+        <p class="ds-paragraph myday-subtle" data-size="xs" data-variant="short" id="homeStopHint" hidden></p>
+        <ul class="myday-departures" id="homeDeps"></ul>
+      </div>
+    </section>
+    <section class="ds-card">
+      <div class="ds-card__block">
+        <div class="myday-row">
+          <h2 class="ds-heading" data-size="xs">Denne uka</h2>
+          <span class="ds-tag" data-variant="outline" id="weekLbl"></span>
+        </div>
+        <div class="myday-week" id="weekList"></div>
+      </div>
+    </section>
+  </main>
+
   <!-- KALENDER -->
   <main class="myday-view" id="v-kalender" hidden>
     <div class="ds-card">
@@ -178,6 +201,10 @@
 </dialog>
 
 <nav class="myday-bottom-nav" aria-label="Hovedmeny" data-color="accent" id="nav" hidden>
+  <a href="#hjem" data-tab="hjem" class="ds-focus">
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg>
+    Hjem
+  </a>
   <a href="#kalender" data-tab="kalender" class="ds-focus">
     <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
     Kalender

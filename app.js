@@ -20,6 +20,7 @@ const isMulti = e => evEnd(e) !== e.date;
 function isoWeek(d) { const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const day = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - day); const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1)); return Math.ceil(((t - y0) / 864e5 + 1) / 7); }
 const svg = (d, size = 20) => `<svg aria-hidden="true" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${d}</svg>`;
 const ICON_TRASH = '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>';
+const ICON_STAR = '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" stroke-linejoin="round"/>';
 
 const today = new Date(); today.setHours(0, 0, 0, 0);
 let viewMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -77,14 +78,16 @@ function listen(col, assign, after) {
 }
 
 /* ---------- Visninger ---------- */
-const tabs = ["kalender", "handleliste", "avganger"];
-function currentTab() { return tabs.includes(location.hash.slice(1)) ? location.hash.slice(1) : "kalender"; }
+const tabs = ["hjem", "kalender", "handleliste", "avganger"];
+function currentTab() { return tabs.includes(location.hash.slice(1)) ? location.hash.slice(1) : "hjem"; }
+const showsDepartures = () => ["hjem", "avganger"].includes(currentTab());
 function showTab() {
   if (!me) return;
   const t = currentTab();
   tabs.forEach(n => { $("v-" + n).hidden = n !== t; });
   document.querySelectorAll(".myday-bottom-nav a").forEach(a => a.dataset.tab === t ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current"));
-  if (t === "avganger") refreshDepartures();
+  if (t === "hjem") renderHome();
+  if (showsDepartures()) refreshDepartures();
 }
 addEventListener("hashchange", showTab);
 
@@ -96,10 +99,10 @@ function showLogin() {
 function showApp(user) {
   me = { uid: user.uid, name: user.displayName || (user.email || "").split("@")[0] };
   $("v-login").hidden = true; $("nav").hidden = false; $("signoutRow").hidden = false;
-  listen("events", a => events = a, () => { renderCal(); renderDay(); });
+  listen("events", a => events = a, () => { renderCal(); renderDay(); renderHome(); });
   listen("shopping", a => shop = a, renderShop);
-  listen("stops", a => stops = a, () => { renderStops(); refreshDepartures(); });
-  renderCal(); renderDay(); renderShop(); renderStops();
+  listen("stops", a => stops = a, () => { renderStops(); renderHome(); refreshDepartures(); });
+  renderCal(); renderDay(); renderShop(); renderStops(); renderHome();
   showTab();
 }
 
@@ -272,16 +275,18 @@ async function fetchDepartures(id) {
 }
 let refreshing = false;
 async function refreshDepartures() {
-  if (refreshing || !me || currentTab() !== "avganger" || document.hidden) return;
+  if (refreshing || !me || !showsDepartures() || document.hidden) return;
   refreshing = true;
-  await Promise.all(stops.map(async s => {
+  const list = currentTab() === "hjem" ? [favoriteStop()].filter(Boolean) : stops.filter(s => s.enturId);
+  await Promise.all(list.map(async s => {
     try { departures[s.enturId] = { calls: await fetchDepartures(s.enturId), at: new Date() }; }
     catch (e) { departures[s.enturId] = { ...(departures[s.enturId] || {}), error: true }; }
   }));
   refreshing = false;
-  renderStops();
+  renderStops(); renderHome();
 }
 setInterval(refreshDepartures, 30000);
+setInterval(() => { if (me && currentTab() === "hjem") renderHome(); }, 60000);
 document.addEventListener("visibilitychange", refreshDepartures);
 
 function minutesText(dt) {
@@ -306,49 +311,118 @@ function renderStops() {
     const nm = document.createElement("div"); nm.className = "myday-stop__name";
     const h = document.createElement("h2"); h.className = "ds-heading"; h.setAttribute("data-size", "xs"); h.textContent = s.name; nm.appendChild(h);
     if (s.place) nm.appendChild(para(s.place, "xs", "myday-subtle"));
-    head.append(nm, iconBtn("Fjern " + s.name, b => remove("stops", s.id, b)));
+    const fav = document.createElement("button"); fav.type = "button"; fav.className = "ds-button myday-fav";
+    fav.setAttribute("data-icon", ""); fav.setAttribute("data-variant", "tertiary"); fav.setAttribute("data-color", "neutral");
+    const isFav = favoriteStop() === s;
+    fav.setAttribute("aria-pressed", isFav ? "true" : "false");
+    fav.setAttribute("aria-label", isFav ? s.name + " er favoritt på Hjem" : "Vis " + s.name + " på Hjem");
+    fav.innerHTML = svg(ICON_STAR);
+    fav.onclick = () => setFavorite(s, fav);
+    head.append(nm, fav, iconBtn("Fjern " + s.name, b => remove("stops", s.id, b)));
     blk.appendChild(head);
-
+    blk.appendChild(departureList(departures[s.enturId]));
     const d = departures[s.enturId];
-    const ul = document.createElement("ul"); ul.className = "myday-departures";
-    if (!d) {
-      for (let i = 0; i < 3; i++) { const li = document.createElement("li"); li.innerHTML = '<span class="ds-skeleton" data-variant="text" aria-hidden="true"></span>'; ul.appendChild(li); }
-    } else if (d.error && !d.calls) {
-      ul.appendChild(emptyLi("Fikk ikke hentet avganger. Prøver igjen om litt."));
-    } else if (!d.calls.length) {
-      ul.appendChild(emptyLi("Ingen avganger de neste to timene."));
-    } else {
-      d.calls.forEach(c => {
-        const li = document.createElement("li"); li.className = "myday-departure";
-        if (c.cancellation) li.setAttribute("data-cancelled", "");
-        const line = c.serviceJourney && c.serviceJourney.line || {};
-        const ln = document.createElement("span"); ln.className = "myday-line"; ln.textContent = line.publicCode || "–";
-        ln.setAttribute("aria-label", (MODES[line.transportMode] || "Linje") + " " + (line.publicCode || ""));
-        const dest = document.createElement("span"); dest.className = "myday-departure__dest";
-        dest.textContent = (c.destinationDisplay && c.destinationDisplay.frontText) || "";
-        const sub = document.createElement("small");
-        sub.textContent = [MODES[line.transportMode], c.quay && c.quay.publicCode ? "plattform " + c.quay.publicCode : ""].filter(Boolean).join(" · ");
-        dest.appendChild(sub);
-        const exp = new Date(c.expectedDepartureTime), aim = new Date(c.aimedDepartureTime);
-        const tm = document.createElement("span"); tm.className = "myday-departure__time";
-        if (c.cancellation) {
-          tm.textContent = fmtClock.format(aim);
-          const tag = document.createElement("span"); tag.className = "ds-tag"; tag.setAttribute("data-color", "danger"); tag.setAttribute("data-size", "sm"); tag.textContent = "Innstilt";
-          dest.appendChild(tag);
-        } else {
-          tm.textContent = minutesText(exp);
-          const late = Math.round((exp - aim) / 60000);
-          const small = document.createElement("small");
-          small.textContent = !c.realtime ? "rutetid" : (late >= 2 ? "ny tid, var " + fmtClock.format(aim) : "sanntid");
-          tm.appendChild(small);
-        }
-        li.append(ln, dest, tm); ul.appendChild(li);
-      });
-    }
-    blk.appendChild(ul);
     if (d && d.at) blk.appendChild(para("Oppdatert " + fmtClock.format(d.at) + (d.error ? ", siste forsøk feilet" : ""), "xs", "myday-subtle"));
     card.appendChild(blk); box.appendChild(card);
   });
+}
+
+/* Avgangsliste, brukt både på Hjem og Avganger */
+function departureList(d, max) {
+  const ul = document.createElement("ul"); ul.className = "myday-departures";
+  if (!d) {
+    for (let i = 0; i < 3; i++) { const li = document.createElement("li"); li.innerHTML = '<span class="ds-skeleton" data-variant="text" aria-hidden="true"></span>'; ul.appendChild(li); }
+    return ul;
+  }
+  if (d.error && !d.calls) { ul.appendChild(emptyLi("Fikk ikke hentet avganger. Prøver igjen om litt.")); return ul; }
+  const calls = (d.calls || []).filter(c => new Date(c.expectedDepartureTime) > Date.now() - 60000).slice(0, max || 99);
+  if (!calls.length) { ul.appendChild(emptyLi("Ingen avganger de neste to timene.")); return ul; }
+  calls.forEach(c => {
+    const li = document.createElement("li"); li.className = "myday-departure";
+    if (c.cancellation) li.setAttribute("data-cancelled", "");
+    const line = c.serviceJourney && c.serviceJourney.line || {};
+    const ln = document.createElement("span"); ln.className = "myday-line"; ln.textContent = line.publicCode || "–";
+    ln.setAttribute("aria-label", (MODES[line.transportMode] || "Linje") + " " + (line.publicCode || ""));
+    const dest = document.createElement("span"); dest.className = "myday-departure__dest";
+    dest.textContent = (c.destinationDisplay && c.destinationDisplay.frontText) || "";
+    const sub = document.createElement("small");
+    sub.textContent = [MODES[line.transportMode], c.quay && c.quay.publicCode ? "plattform " + c.quay.publicCode : ""].filter(Boolean).join(" · ");
+    dest.appendChild(sub);
+    const exp = new Date(c.expectedDepartureTime), aim = new Date(c.aimedDepartureTime);
+    const tm = document.createElement("span"); tm.className = "myday-departure__time";
+    if (c.cancellation) {
+      tm.textContent = fmtClock.format(aim);
+      const tag = document.createElement("span"); tag.className = "ds-tag"; tag.setAttribute("data-color", "danger"); tag.setAttribute("data-size", "sm"); tag.textContent = "Innstilt";
+      dest.appendChild(tag);
+    } else {
+      tm.textContent = minutesText(exp);
+      const late = Math.round((exp - aim) / 60000);
+      const small = document.createElement("small");
+      small.textContent = !c.realtime ? "rutetid" : (late >= 2 ? "ny tid, var " + fmtClock.format(aim) : "sanntid");
+      tm.appendChild(small);
+    }
+    li.append(ln, dest, tm); ul.appendChild(li);
+  });
+  return ul;
+}
+
+/* Favoritt: den som er stjernemerket, ellers den første som ble lagret */
+function favoriteStop() {
+  const valid = stops.filter(s => s.enturId).sort((a, b) => a.createdAt - b.createdAt);
+  return valid.find(s => s.favorite) || valid[0] || null;
+}
+async function setFavorite(s, btn) {
+  btn.disabled = true;
+  for (const o of stops) {
+    const want = o.id === s.id;
+    if (!!o.favorite !== want) await patch("stops", o.id, { favorite: want });
+  }
+  btn.disabled = false;
+}
+
+/* ---------- Hjem ---------- */
+function endMoment(e) {
+  const last = evEnd(e);
+  if (e.endTime) { const d = parse(last); const [h, m] = e.endTime.split(":").map(Number); d.setHours(h, m); return d; }
+  if (e.time && !isMulti(e)) { const d = parse(e.date); const [h, m] = e.time.split(":").map(Number); d.setHours(h + 1, m); return d; } // uten sluttid: regnes som passert en time etter start
+  const d = parse(last); d.setHours(23, 59, 59); return d;
+}
+function renderHome() {
+  if (!me) return;
+  // Avganger fra favoritten
+  const fav = favoriteStop();
+  const depsBox = $("homeDeps"); depsBox.replaceChildren();
+  $("homeStopHint").hidden = true;
+  if (!fav) {
+    $("homeStopName").textContent = "Neste avganger";
+    depsBox.appendChild(emptyLi("Ingen holdeplass valgt. Søk opp en under Avganger og trykk på stjernen."));
+  } else {
+    $("homeStopName").textContent = fav.name;
+    if (!fav.favorite) { $("homeStopHint").textContent = "Trykk på stjernen under Avganger for å velge en annen holdeplass her."; $("homeStopHint").hidden = false; }
+    depsBox.replaceWith(Object.assign(departureList(departures[fav.enturId], 3), { id: "homeDeps" }));
+  }
+
+  // Resten av uka (mandag–søndag), uten passerte avtaler
+  const now = new Date();
+  const monday = new Date(today); monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+  const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+  $("weekLbl").textContent = "Uke " + isoWeek(today);
+  const box = $("weekList"); box.textContent = "";
+  const left = events.filter(e => e.date <= iso(sunday) && evEnd(e) >= iso(today) && endMoment(e) > now).sort(sortEv);
+  if (!left.length) { box.appendChild(para("Ingenting mer planlagt denne uka.", "sm", "myday-subtle")); return; }
+  for (let d = new Date(today); d <= sunday; d.setDate(d.getDate() + 1)) {
+    const k = iso(d);
+    // flerdagsavtaler vises på første gjenværende dag
+    const dayEvs = left.filter(e => (e.date > iso(today) ? e.date : iso(today)) === k);
+    if (!dayEvs.length) continue;
+    const g = document.createElement("div"); g.className = "myday-week__day";
+    if (k === iso(today)) g.setAttribute("data-today", "");
+    const h = document.createElement("h3"); h.className = "ds-heading"; h.setAttribute("data-size", "2xs");
+    h.textContent = k === iso(today) ? "I dag" : fmtLong.format(d);
+    const ul = document.createElement("ul"); ul.className = "myday-events";
+    dayEvs.forEach(e => ul.appendChild(evItem(e, false)));
+    g.append(h, ul); box.appendChild(g);
+  }
 }
 
 /* Søk etter holdeplass */

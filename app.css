@@ -113,6 +113,14 @@
   .myday-results li:first-child { border-block-start: 0; }
   .myday-results button { inline-size: 100%; justify-content: flex-start; text-align: start; }
 
+  /* Hjem: ukeoversikt */
+  .myday-week { display: grid; gap: var(--ds-size-3); }
+  .myday-week__day { display: grid; gap: var(--ds-size-1); }
+  .myday-week__day > .ds-heading { color: var(--ds-color-neutral-text-subtle); text-transform: capitalize; }
+  .myday-week__day[data-today] > .ds-heading { color: var(--ds-color-text-default); }
+  .myday-fav[aria-pressed="true"] { color: var(--ds-color-warning-text-default); }
+  .myday-fav[aria-pressed="true"] svg { fill: currentColor; }
+
   /* Dialog-skjema */
   .myday-form { display: grid; gap: var(--ds-size-4); }
   .myday-dates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ds-size-2); }
@@ -122,7 +130,7 @@
   /* Bunnavigasjon */
   .myday-bottom-nav {
     position: fixed; inset-inline: 0; inset-block-end: 0; z-index: 6;
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--ds-size-1);
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--ds-size-1);
     padding-block: var(--ds-size-2) calc(var(--ds-size-2) + env(safe-area-inset-bottom, 0px));
     padding-left: max(var(--ds-size-4), env(safe-area-inset-left, 0px));
     padding-right: max(var(--ds-size-4), env(safe-area-inset-right, 0px));
