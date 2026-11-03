@@ -1,0 +1,18 @@
+rules_version = '2';
+
+// Bare dere to får lese og skrive. Bytt ut e-postadressene med deres egne.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isFamily() {
+      return request.auth != null
+        && request.auth.token.email in [
+          'larsiveg@gmail.com',
+          'KONAS-EPOST@example.com'
+        ];
+    }
+
+    match /events/{id}   { allow read, write: if isFamily(); }
+    match /shopping/{id} { allow read, write: if isFamily(); }
+    match /stops/{id}    { allow read, write: if isFamily(); }
+  }
+}

@@ -1,0 +1,145 @@
+@layer reset, ds, myday;
+
+/* Layout: én kolonne for mobil, kort per seksjon, fast bunnavigasjon */
+@layer myday {
+  body {
+    font-family: var(--ds-font-family), "Inter", system-ui, sans-serif;
+    font-feature-settings: "cv05" 1;
+    background: var(--ds-color-neutral-background-default);
+    color: var(--ds-color-neutral-text-default);
+    margin: 0;
+    padding-left: max(var(--ds-size-4), env(safe-area-inset-left, 0px));
+    padding-right: max(var(--ds-size-4), env(safe-area-inset-right, 0px));
+  }
+  body::before {
+    content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10;
+    background: var(--ds-color-neutral-background-default);
+  }
+  /* hidden skal vinne over display i egne klasser */
+  body [hidden], body[hidden] { display: none; }
+
+  .myday-wrap {
+    max-width: 36rem; margin-inline: auto;
+    display: grid; gap: var(--ds-size-4);
+    padding-block: var(--ds-size-2) calc(var(--ds-size-22) + env(safe-area-inset-bottom, 0px));
+  }
+  .myday-header {
+    position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+    background: var(--ds-color-neutral-background-default);
+    padding-block: var(--ds-size-3) var(--ds-size-2);
+    display: flex; align-items: baseline; justify-content: space-between; gap: var(--ds-size-3);
+  }
+  .myday-header .ds-paragraph { color: var(--ds-color-neutral-text-subtle); text-align: end; }
+  .myday-view { display: grid; gap: var(--ds-size-4); }
+  .myday-view > * { min-width: 0; }
+  .myday-row { display: flex; align-items: center; justify-content: space-between; gap: var(--ds-size-2); }
+  .myday-subtle { color: var(--ds-color-neutral-text-subtle); }
+  .myday-cap { text-transform: capitalize; }
+  .myday-signout { display: flex; justify-content: center; margin: 0; }
+
+  /* Kalender-rutenett */
+  .myday-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--ds-size-1); text-align: center; }
+  .myday-cal__dow {
+    font-size: var(--ds-body-xs-font-size); font-weight: var(--ds-font-weight-semibold);
+    color: var(--ds-color-neutral-text-subtle); padding-block: var(--ds-size-1);
+  }
+  .myday-day {
+    position: relative; min-block-size: 44px;
+    border: 0; border-radius: var(--ds-border-radius-md);
+    background: transparent; color: var(--ds-color-neutral-text-default);
+    font: inherit; font-variant-numeric: tabular-nums; cursor: pointer;
+  }
+  .myday-day:hover { background: var(--ds-color-surface-hover); }
+  .myday-day[data-other] { color: var(--ds-color-neutral-text-subtle); opacity: var(--ds-opacity-disabled); }
+  .myday-day[data-today] { color: var(--ds-color-text-default); font-weight: var(--ds-font-weight-semibold); box-shadow: inset 0 0 0 var(--ds-border-width-default) var(--ds-color-border-default); }
+  .myday-day[aria-pressed="true"] { background: var(--ds-color-base-default); color: var(--ds-color-base-contrast-default); box-shadow: none; }
+  .myday-day__dot {
+    position: absolute; left: 50%; bottom: var(--ds-size-1);
+    width: var(--ds-size-1); height: var(--ds-size-1); translate: -50% 0;
+    border-radius: var(--ds-border-radius-full); background: var(--ds-color-base-default);
+  }
+  .myday-day[aria-pressed="true"] .myday-day__dot { background: var(--ds-color-base-contrast-default); }
+
+  /* Avtaler */
+  .myday-events, .myday-items, .myday-results, .myday-departures { list-style: none; margin: 0; padding: 0; display: grid; }
+  .myday-event {
+    display: grid; grid-template-columns: var(--ds-size-15) minmax(0, 1fr) auto; gap: var(--ds-size-3); align-items: center;
+    padding-block: var(--ds-size-2);
+    border-block-start: var(--ds-border-width-default) solid var(--ds-color-neutral-border-subtle);
+  }
+  .myday-event:first-child { border-block-start: 0; }
+  .myday-event__time {
+    white-space: pre-line; font-variant-numeric: tabular-nums; font-weight: var(--ds-font-weight-semibold);
+    color: var(--ds-color-text-default); font-size: var(--ds-body-sm-font-size); line-height: var(--ds-line-height-sm);
+  }
+  .myday-event__body { min-width: 0; overflow-wrap: anywhere; display: grid; gap: var(--ds-size-1); }
+  .myday-event__body .ds-paragraph, .myday-stop__name .ds-paragraph { margin: 0; }
+
+  /* Handleliste */
+  .myday-item {
+    display: flex; align-items: center; gap: var(--ds-size-2); min-block-size: 44px;
+    border-block-start: var(--ds-border-width-default) solid var(--ds-color-neutral-border-subtle);
+    padding-block: var(--ds-size-1);
+  }
+  .myday-item:first-child { border-block-start: 0; }
+  .myday-item .ds-field { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .myday-item[data-done] label { text-decoration: line-through; color: var(--ds-color-neutral-text-subtle); }
+  .myday-add { display: flex; gap: var(--ds-size-2); align-items: end; }
+  .myday-add .ds-field { flex: 1; min-width: 0; }
+
+  /* Holdeplasser og avganger */
+  .myday-stop__head { display: flex; align-items: center; gap: var(--ds-size-3); }
+  .myday-stop__name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .myday-departure {
+    display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--ds-size-3); align-items: center;
+    min-block-size: 44px;
+    border-block-start: var(--ds-border-width-default) solid var(--ds-color-neutral-border-subtle);
+  }
+  .myday-departure:first-child { border-block-start: 0; }
+  .myday-line {
+    min-inline-size: var(--ds-size-10); text-align: center;
+    padding: var(--ds-size-1) var(--ds-size-2); border-radius: var(--ds-border-radius-sm);
+    background: var(--ds-color-base-default); color: var(--ds-color-base-contrast-default);
+    font-weight: var(--ds-font-weight-semibold); font-variant-numeric: tabular-nums;
+    font-size: var(--ds-body-sm-font-size);
+  }
+  .myday-departure__dest { min-width: 0; overflow-wrap: anywhere; }
+  .myday-departure__dest small { display: block; color: var(--ds-color-neutral-text-subtle); font-size: var(--ds-body-xs-font-size); }
+  .myday-departure__time { font-variant-numeric: tabular-nums; font-weight: var(--ds-font-weight-semibold); text-align: end; }
+  .myday-departure__time small { display: block; font-weight: var(--ds-font-weight-regular); color: var(--ds-color-neutral-text-subtle); font-size: var(--ds-body-xs-font-size); }
+  .myday-departure[data-cancelled] .myday-departure__dest,
+  .myday-departure[data-cancelled] .myday-departure__time { text-decoration: line-through; color: var(--ds-color-neutral-text-subtle); }
+  .myday-results li { border-block-start: var(--ds-border-width-default) solid var(--ds-color-neutral-border-subtle); }
+  .myday-results li:first-child { border-block-start: 0; }
+  .myday-results button { inline-size: 100%; justify-content: flex-start; text-align: start; }
+
+  /* Dialog-skjema */
+  .myday-form { display: grid; gap: var(--ds-size-4); }
+  .myday-dates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ds-size-2); }
+  .myday-dates .ds-input { min-width: 0; width: 100%; }
+  .myday-actions { display: flex; gap: var(--ds-size-2); justify-content: flex-end; flex-wrap: wrap; }
+
+  /* Bunnavigasjon */
+  .myday-bottom-nav {
+    position: fixed; inset-inline: 0; inset-block-end: 0; z-index: 6;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--ds-size-1);
+    padding-block: var(--ds-size-2) calc(var(--ds-size-2) + env(safe-area-inset-bottom, 0px));
+    padding-left: max(var(--ds-size-4), env(safe-area-inset-left, 0px));
+    padding-right: max(var(--ds-size-4), env(safe-area-inset-right, 0px));
+    background: var(--ds-color-neutral-background-default);
+    border-block-start: var(--ds-border-width-default) solid var(--ds-color-neutral-border-subtle);
+  }
+  .myday-bottom-nav a {
+    min-block-size: 44px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--ds-size-1);
+    border-radius: var(--ds-border-radius-md); text-decoration: none;
+    color: var(--ds-color-neutral-text-subtle);
+    font-size: var(--ds-body-xs-font-size); font-weight: var(--ds-font-weight-medium);
+    padding-block: var(--ds-size-1);
+  }
+  .myday-bottom-nav a[aria-current="page"] { color: var(--ds-color-accent-text-default); background: var(--ds-color-accent-surface-tinted); }
+  .myday-bottom-nav svg { width: var(--ds-size-6); height: var(--ds-size-6); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .myday-day, .myday-bottom-nav a { transition: background-color .15s, color .15s; }
+  }
+}
