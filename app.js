@@ -3,7 +3,7 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPe
   from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot }
   from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
-import { firebaseConfig, enturClientName } from "./config.js?v=20261103-7";
+import { firebaseConfig, enturClientName } from "./config.js?v=20261103-8";
 
 /* ---------- Hjelpere ---------- */
 const $ = id => document.getElementById(id);
@@ -125,6 +125,26 @@ $("loginForm").addEventListener("submit", async e => {
 });
 $("signOut").onclick = () => signOut(auth);
 
+/* ---------- Trykk og hold ---------- */
+const LONG_PRESS_MS = 2000;
+function addLongPress(el, onLong) {
+  let timer = null, x = 0, y = 0;
+  const cancel = () => { clearTimeout(timer); timer = null; el.removeAttribute("data-holding"); };
+  el.addEventListener("pointerdown", e => {
+    if (e.button !== 0) return;
+    x = e.clientX; y = e.clientY;
+    el.setAttribute("data-holding", "");
+    timer = setTimeout(() => {
+      timer = null; el.removeAttribute("data-holding");
+      if (navigator.vibrate) navigator.vibrate(15);
+      onLong();
+    }, LONG_PRESS_MS);
+  });
+  el.addEventListener("pointermove", e => { if (timer && Math.hypot(e.clientX - x, e.clientY - y) > 10) cancel(); });
+  ["pointerup", "pointercancel", "pointerleave"].forEach(t => el.addEventListener(t, cancel));
+  el.addEventListener("contextmenu", e => e.preventDefault());
+}
+
 /* ---------- Kalender ---------- */
 function renderCal() {
   $("monthLbl").textContent = fmtMonth.format(viewMonth);
@@ -142,7 +162,9 @@ function renderCal() {
     const has = events.some(e => covers(e, k));
     b.setAttribute("aria-label", fmtLong.format(d) + (has ? ", har avtaler" : ""));
     if (has) { const dot = document.createElement("span"); dot.className = "myday-day__dot"; b.appendChild(dot); }
-    b.onclick = () => { selected = k; if (d.getMonth() !== viewMonth.getMonth()) viewMonth = new Date(d.getFullYear(), d.getMonth(), 1); renderCal(); renderDay(); };
+    const pick = () => { selected = k; if (d.getMonth() !== viewMonth.getMonth()) viewMonth = new Date(d.getFullYear(), d.getMonth(), 1); renderCal(); renderDay(); };
+    b.onclick = () => { if (b.dataset.longpressed) { delete b.dataset.longpressed; return; } pick(); };
+    addLongPress(b, () => { b.dataset.longpressed = "1"; pick(); openNewEvent("center"); });
     cal.appendChild(b);
   }
 }
@@ -182,14 +204,20 @@ const dlg = $("newDlg");
 const allDay = () => $("evAllDay").checked;
 function syncEndMin() { const s = $("evStart").value, e = $("evEnd"); e.min = s; if (e.value && e.value < s) e.value = ""; }
 function clearErrors() { ["evTitleErr", "evEndErr"].forEach(id => $(id).hidden = true); ["evTitle", "evEnd"].forEach(id => $(id).removeAttribute("aria-invalid")); }
-$("openNew").onclick = () => {
+// placement: "bottom" = bunnark (knappen), "center" = dialog midt på (trykk og hold i kalenderen)
+function openNewEvent(placement) {
   clearErrors();
   const s = $("evStart"); s.value = allDay() ? selected : selected + "T" + (s.value.slice(11, 16) || "09:00");
   $("evEnd").value = ""; syncEndMin();
+  dlg.setAttribute("data-placement", placement);
+  dlgOpenedAt = Date.now();
   dlg.showModal(); $("evTitle").focus();
-};
+}
+$("openNew").onclick = () => openNewEvent("bottom");
 $("cancelNew").onclick = () => dlg.close();
-dlg.addEventListener("click", e => { if (e.target === dlg) dlg.close(); });
+let dlgOpenedAt = 0;
+// ignorer klikket som kommer når fingeren slippes rett etter trykk-og-hold
+dlg.addEventListener("click", e => { if (e.target === dlg && Date.now() - dlgOpenedAt > 600) dlg.close(); });
 $("evStart").addEventListener("change", syncEndMin);
 $("evAllDay").addEventListener("change", () => {
   const ad = allDay();

@@ -57,6 +57,15 @@
     font: inherit; font-variant-numeric: tabular-nums; cursor: pointer;
   }
   .myday-day:hover { background: var(--ds-color-surface-hover); }
+  .myday-day { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+  .myday-day[data-holding] { background: var(--ds-color-surface-active); }
+  @media (prefers-reduced-motion: no-preference) {
+    .myday-day[data-holding] { animation: myday-hold 2s linear forwards; }
+    @keyframes myday-hold {
+      from { box-shadow: inset 0 0 0 0 var(--ds-color-base-default); }
+      to   { box-shadow: inset 0 0 0 var(--ds-size-1) var(--ds-color-base-default); }
+    }
+  }
   .myday-day[data-other] { color: var(--ds-color-neutral-text-subtle); opacity: var(--ds-opacity-disabled); }
   .myday-day[data-today] { color: var(--ds-color-text-default); font-weight: var(--ds-font-weight-semibold); box-shadow: inset 0 0 0 var(--ds-border-width-default) var(--ds-color-border-default); }
   .myday-day[aria-pressed="true"] { background: var(--ds-color-base-default); color: var(--ds-color-base-contrast-default); box-shadow: none; }
