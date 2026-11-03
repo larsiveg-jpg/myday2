@@ -3,7 +3,7 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPe
   from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot }
   from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
-import { firebaseConfig, enturClientName } from "./config.js?v=20261103-11";
+import { firebaseConfig, enturClientName } from "./config.js?v=20261103-12";
 
 /* ---------- Hjelpere ---------- */
 const $ = id => document.getElementById(id);
@@ -211,24 +211,37 @@ function openNewEvent(placement) {
   $("evEnd").value = ""; syncEndMin();
   dlg.setAttribute("data-placement", placement);
   dlgOpenedAt = Date.now();
-  dlg.showModal(); fitDialogToViewport(); $("evTitle").focus();
+  dlg.showModal(); startFitLoop(); $("evTitle").focus();
 }
 $("openNew").onclick = () => openNewEvent("bottom");
 
 // Hold dialogen innenfor den synlige delen av skjermen, over tastaturet.
-// visualViewport krymper når tastaturet åpnes (iOS endrer ikke selve layout-høyden).
+// Plasseringen regnes fra toppen av visualViewport (offsetTop + height). Det er
+// stabilt på iOS, der window.innerHeight av og til krymper sammen med tastaturet.
+// Mens dialogen er åpen sjekkes plasseringen hver frame, fordi iOS ikke alltid
+// sender resize-hendelser når tastaturet åpnes for andre gang.
 const vv = window.visualViewport;
+let fitLoop = 0, lastFit = "";
 function fitDialogToViewport() {
   if (!vv || !dlg.open) return;
-  const top = Math.max(0, vv.offsetTop);
-  const bottom = Math.max(0, window.innerHeight - vv.offsetTop - vv.height);
-  dlg.style.setProperty("--myday-vv-top", top + "px");
-  dlg.style.setProperty("--myday-vv-bottom", bottom + "px");
-  dlg.style.setProperty("--myday-vv-height", vv.height + "px");
+  const vTop = vv.offsetTop, vH = vv.height;
+  dlg.style.setProperty("--myday-vv-height", vH + "px");
+  const h = Math.min(dlg.offsetHeight, vH);
+  const top = dlg.getAttribute("data-placement") === "bottom" ? vTop + vH - h : vTop + Math.max(0, (vH - h) / 2);
+  const key = Math.round(top) + "/" + Math.round(vH);
+  if (key === lastFit) return;
+  lastFit = key;
+  dlg.style.setProperty("--myday-vv-top", Math.round(top) + "px");
 }
-if (vv) { vv.addEventListener("resize", fitDialogToViewport); vv.addEventListener("scroll", fitDialogToViewport); }
-dlg.addEventListener("focusin", () => requestAnimationFrame(fitDialogToViewport));
-dlg.addEventListener("close", () => ["--myday-vv-top", "--myday-vv-bottom", "--myday-vv-height"].forEach(k => dlg.style.removeProperty(k)));
+function startFitLoop() {
+  cancelAnimationFrame(fitLoop); lastFit = "";
+  const tick = () => { if (!dlg.open) return; fitDialogToViewport(); fitLoop = requestAnimationFrame(tick); };
+  tick();
+}
+dlg.addEventListener("close", () => {
+  cancelAnimationFrame(fitLoop); lastFit = "";
+  ["--myday-vv-top", "--myday-vv-height"].forEach(k => dlg.style.removeProperty(k));
+});
 $("cancelNew").onclick = () => dlg.close();
 let dlgOpenedAt = 0;
 // ignorer klikket som kommer når fingeren slippes rett etter trykk-og-hold
