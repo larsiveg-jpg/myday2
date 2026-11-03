@@ -38,7 +38,7 @@
   .myday-signout { display: flex; justify-content: center; margin: 0; }
 
   /* Kalender-rutenett */
-  .myday-cal-card {
+  .myday-cal-card, .myday-flat {
     --dsc-card-border-width: 0;
     --dsc-card-background: transparent;
     --dsc-card-padding: 0;

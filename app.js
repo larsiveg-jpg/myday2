@@ -3,7 +3,7 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPe
   from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot }
   from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
-import { firebaseConfig, enturClientName } from "./config.js?v=20261103-6";
+import { firebaseConfig, enturClientName } from "./config.js?v=20261103-7";
 
 /* ---------- Hjelpere ---------- */
 const $ = id => document.getElementById(id);
@@ -258,7 +258,7 @@ const DEP_QUERY = `query($id: String!) {
       realtime cancellation aimedDepartureTime expectedDepartureTime
       destinationDisplay { frontText }
       quay { publicCode }
-      serviceJourney { line { publicCode transportMode } }
+      serviceJourney { line { publicCode transportMode presentation { colour textColour } } }
     }
   }
 }`;
@@ -305,7 +305,7 @@ function renderStops() {
     c.appendChild(b); box.appendChild(c); return;
   }
   valid.forEach(s => {
-    const card = document.createElement("section"); card.className = "ds-card";
+    const card = document.createElement("section"); card.className = "ds-card myday-flat";
     const blk = document.createElement("div"); blk.className = "ds-card__block";
     const head = document.createElement("div"); head.className = "myday-stop__head";
     const nm = document.createElement("div"); nm.className = "myday-stop__name";
@@ -327,6 +327,17 @@ function renderStops() {
   });
 }
 
+/* Linjefarger fra Entur (hex uten #). Faller tilbake til temafargen når Entur ikke oppgir farge. */
+const HEX = /^[0-9a-f]{6}$/i;
+function applyLineColour(el, pres) {
+  const bg = pres && pres.colour, fg = pres && pres.textColour;
+  if (!bg || !HEX.test(bg)) return;
+  el.style.background = "#" + bg;
+  if (fg && HEX.test(fg) && fg.toLowerCase() !== bg.toLowerCase()) { el.style.color = "#" + fg; return; }
+  const [r, g, b] = [0, 2, 4].map(i => parseInt(bg.slice(i, i + 2), 16) / 255).map(c => c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  el.style.color = (0.2126 * r + 0.7152 * g + 0.0722 * b) > 0.4 ? "#000000" : "#ffffff";
+}
+
 /* Avgangsliste, brukt både på Hjem og Avganger */
 function departureList(d, max) {
   const ul = document.createElement("ul"); ul.className = "myday-departures";
@@ -342,6 +353,7 @@ function departureList(d, max) {
     if (c.cancellation) li.setAttribute("data-cancelled", "");
     const line = c.serviceJourney && c.serviceJourney.line || {};
     const ln = document.createElement("span"); ln.className = "myday-line"; ln.textContent = line.publicCode || "–";
+    applyLineColour(ln, line.presentation);
     ln.setAttribute("aria-label", (MODES[line.transportMode] || "Linje") + " " + (line.publicCode || ""));
     const dest = document.createElement("span"); dest.className = "myday-departure__dest";
     dest.textContent = (c.destinationDisplay && c.destinationDisplay.frontText) || "";
