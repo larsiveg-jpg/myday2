@@ -3,7 +3,7 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPe
   from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot }
   from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
-import { firebaseConfig, enturClientName } from "./config.js?v=20261103-8";
+import { firebaseConfig, enturClientName } from "./config.js?v=20261103-9";
 
 /* ---------- Hjelpere ---------- */
 const $ = id => document.getElementById(id);
@@ -367,7 +367,8 @@ function applyLineColour(el, pres) {
 }
 
 /* Avgangsliste, brukt både på Hjem og Avganger */
-function departureList(d, max) {
+// compact: bare linje, destinasjon og tid (Hjem)
+function departureList(d, max, compact) {
   const ul = document.createElement("ul"); ul.className = "myday-departures";
   if (!d) {
     for (let i = 0; i < 3; i++) { const li = document.createElement("li"); li.innerHTML = '<span class="ds-skeleton" data-variant="text" aria-hidden="true"></span>'; ul.appendChild(li); }
@@ -388,19 +389,20 @@ function departureList(d, max) {
     const sub = document.createElement("small");
     sub.textContent = c.quay && c.quay.publicCode ? "Plattform " + c.quay.publicCode : "";
     if (!sub.textContent) sub.hidden = true;
-    dest.appendChild(sub);
+    if (!compact) dest.appendChild(sub);
     const exp = new Date(c.expectedDepartureTime), aim = new Date(c.aimedDepartureTime);
     const tm = document.createElement("span"); tm.className = "myday-departure__time";
     if (c.cancellation) {
       tm.textContent = fmtClock.format(aim);
       const tag = document.createElement("span"); tag.className = "ds-tag"; tag.setAttribute("data-color", "danger"); tag.setAttribute("data-size", "sm"); tag.textContent = "Innstilt";
+      if (compact) { tag.className = "ds-sr-only"; tag.textContent = ", innstilt"; }
       dest.appendChild(tag);
     } else {
       tm.textContent = minutesText(exp);
       const late = Math.round((exp - aim) / 60000);
       const small = document.createElement("small");
       small.textContent = !c.realtime ? "rutetid" : (late >= 2 ? "ny tid, var " + fmtClock.format(aim) : "sanntid");
-      tm.appendChild(small);
+      if (!compact) tm.appendChild(small);
     }
     li.append(ln, dest, tm); ul.appendChild(li);
   });
@@ -440,7 +442,7 @@ function renderHome() {
   } else {
     $("homeStopName").textContent = fav.name;
     if (!fav.favorite) { $("homeStopHint").textContent = "Trykk på stjernen under Avganger for å velge en annen holdeplass her."; $("homeStopHint").hidden = false; }
-    depsBox.replaceWith(Object.assign(departureList(departures[fav.enturId], 3), { id: "homeDeps" }));
+    depsBox.replaceWith(Object.assign(departureList(departures[fav.enturId], 3, true), { id: "homeDeps" }));
   }
 
   // Resten av uka (mandag–søndag), uten passerte avtaler
