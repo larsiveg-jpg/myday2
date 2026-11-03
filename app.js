@@ -3,7 +3,7 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPe
   from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot }
   from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
-import { firebaseConfig, enturClientName } from "./config.js?v=20261103-3";
+import { firebaseConfig, enturClientName } from "./config.js?v=20261103-4";
 
 /* ---------- Hjelpere ---------- */
 const $ = id => document.getElementById(id);
@@ -346,7 +346,8 @@ function departureList(d, max) {
     const dest = document.createElement("span"); dest.className = "myday-departure__dest";
     dest.textContent = (c.destinationDisplay && c.destinationDisplay.frontText) || "";
     const sub = document.createElement("small");
-    sub.textContent = [MODES[line.transportMode], c.quay && c.quay.publicCode ? "plattform " + c.quay.publicCode : ""].filter(Boolean).join(" · ");
+    sub.textContent = c.quay && c.quay.publicCode ? "Plattform " + c.quay.publicCode : "";
+    if (!sub.textContent) sub.hidden = true;
     dest.appendChild(sub);
     const exp = new Date(c.expectedDepartureTime), aim = new Date(c.aimedDepartureTime);
     const tm = document.createElement("span"); tm.className = "myday-departure__time";
