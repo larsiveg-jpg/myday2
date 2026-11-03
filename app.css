@@ -38,6 +38,13 @@
   .myday-signout { display: flex; justify-content: center; margin: 0; }
 
   /* Kalender-rutenett */
+  .myday-cal-card {
+    --dsc-card-border-width: 0;
+    --dsc-card-background: transparent;
+    --dsc-card-padding: 0;
+    box-shadow: none;
+  }
+  .myday-cal-card .myday-row { margin-block-end: var(--ds-size-2); }
   .myday-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--ds-size-1); text-align: center; }
   .myday-cal__dow {
     font-size: var(--ds-body-xs-font-size); font-weight: var(--ds-font-weight-semibold);
