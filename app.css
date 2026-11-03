@@ -67,7 +67,12 @@
     }
   }
   .myday-day[data-other] { color: var(--ds-color-neutral-text-subtle); opacity: var(--ds-opacity-disabled); }
-  .myday-day[data-today] { color: var(--ds-color-text-default); font-weight: var(--ds-font-weight-semibold); box-shadow: inset 0 0 0 var(--ds-border-width-default) var(--ds-color-border-default); }
+  /* I dag: gul markering fra paletten */
+  .myday-day[data-today] {
+    color: var(--ds-color-brand3-text-default); font-weight: var(--ds-font-weight-semibold);
+    background: var(--ds-color-brand3-surface-tinted);
+    box-shadow: inset 0 0 0 var(--ds-border-width-default) var(--ds-color-brand3-border-default);
+  }
   .myday-day[aria-pressed="true"] { background: var(--ds-color-base-default); color: var(--ds-color-base-contrast-default); box-shadow: none; }
   .myday-day__dot {
     position: absolute; left: 50%; bottom: var(--ds-size-1);
@@ -134,8 +139,8 @@
   .myday-week__day { display: grid; gap: var(--ds-size-1); }
   .myday-week__day > .ds-heading { color: var(--ds-color-neutral-text-subtle); text-transform: capitalize; }
   .myday-week__day[data-today] > .ds-heading { color: var(--ds-color-text-default); }
-  .myday-fav[aria-pressed="true"] { color: var(--ds-color-warning-text-default); }
-  .myday-fav[aria-pressed="true"] svg { fill: currentColor; }
+  .myday-fav[aria-pressed="true"] { color: var(--ds-color-brand3-text-default); }
+  .myday-fav[aria-pressed="true"] svg { fill: var(--ds-color-brand3-base-default); }
 
   /* Dialog-skjema */
   .myday-form { display: grid; gap: var(--ds-size-4); }
