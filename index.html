@@ -15,10 +15,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@digdir/designsystemet-css@1.23.0/dist/src/index.css">
-  <link rel="stylesheet" href="theme/myday.css?v=20261103-13">
-  <link rel="stylesheet" href="app.css?v=20261103-13">
+  <link rel="stylesheet" href="theme/myday.css?v=20261103-14">
+  <link rel="stylesheet" href="app.css?v=20261103-14">
   <script src="https://cdn.jsdelivr.net/npm/@digdir/designsystemet-web@1.23.0/dist/umd/index.js" defer></script>
-  <script type="module" src="app.js?v=20261103-13"></script>
+  <script type="module" src="app.js?v=20261103-14"></script>
 </head>
 <body>
 <div class="myday-wrap" data-color="accent">
@@ -125,6 +125,9 @@
             <input class="ds-input" type="text" id="shopText" autocomplete="off">
           </ds-field>
           <button class="ds-button" type="submit">Legg til</button>
+          <button class="ds-button" type="button" data-icon data-variant="secondary" id="scanAdd" aria-label="Skann strekkode" data-tooltip="Skann strekkode" hidden>
+            <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 8v8M10.5 8v8M14 8v8M17 8v8"/></svg>
+          </button>
         </form>
       </div>
     </div>
@@ -135,6 +138,13 @@
           <span class="ds-tag" data-variant="outline" id="shopCount" hidden></span>
         </div>
         <ul class="myday-items" id="shopList" data-color="accent"></ul>
+      </div>
+      <div class="ds-card__block myday-sum" id="shopSum" hidden>
+        <div>
+          <p class="ds-paragraph" data-size="sm" data-variant="short"><strong>Sum hos Rema 1000</strong></p>
+          <p class="ds-paragraph myday-subtle" data-size="xs" data-variant="short" id="shopSumNote"></p>
+        </div>
+        <p class="ds-paragraph myday-sum__total" data-size="md" data-variant="short" id="shopSumTotal" aria-live="polite"></p>
       </div>
       <div class="ds-card__block" id="clearRow" hidden>
         <div class="myday-actions">
@@ -166,7 +176,7 @@
 </div>
 
 <!-- Ny avtale: bunnark -->
-<dialog class="ds-dialog" id="newDlg" data-placement="bottom" closedby="any" aria-labelledby="newDlgTitle">
+<dialog class="ds-dialog myday-kbfit" id="newDlg" data-placement="bottom" closedby="any" aria-labelledby="newDlgTitle">
   <div class="ds-dialog__block">
     <h2 class="ds-heading" data-size="sm" id="newDlgTitle">Ny avtale</h2>
   </div>
@@ -197,6 +207,48 @@
         <button class="ds-button" type="submit" id="evAdd">Lagre avtale</button>
       </div>
     </form>
+  </div>
+</dialog>
+
+<!-- Koble vare til produkt hos Rema 1000 -->
+<dialog class="ds-dialog myday-kbfit" id="prodDlg" data-placement="bottom" closedby="any" aria-labelledby="prodDlgTitle">
+  <div class="ds-dialog__block">
+    <h2 class="ds-heading" data-size="sm" id="prodDlgTitle">Finn pris</h2>
+    <p class="ds-paragraph myday-subtle" data-size="sm" data-variant="short">Velg varen hos Rema 1000. Valget huskes til neste gang.</p>
+  </div>
+  <div class="ds-dialog__block myday-form">
+    <div class="myday-add">
+      <ds-field class="ds-field">
+        <label for="prodSearch">Søk etter vare</label>
+        <input class="ds-input" type="search" id="prodSearch" autocomplete="off" enterkeyhint="search">
+      </ds-field>
+      <button class="ds-button" type="button" data-icon data-variant="secondary" id="prodScan" aria-label="Skann strekkode" data-tooltip="Skann strekkode">
+        <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 8v8M10.5 8v8M14 8v8M17 8v8"/></svg>
+      </button>
+    </div>
+    <p class="ds-paragraph myday-subtle" data-size="sm" data-variant="short" id="prodStatus" aria-live="polite"></p>
+    <ul class="myday-products" id="prodResults"></ul>
+    <div class="myday-actions">
+      <button class="ds-button" type="button" data-variant="tertiary" data-color="danger" id="prodUnlink" hidden>Fjern kobling</button>
+      <button class="ds-button" type="button" data-variant="secondary" id="prodCancel">Avbryt</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- Skann strekkode -->
+<dialog class="ds-dialog" id="scanDlg" data-placement="center" closedby="any" aria-labelledby="scanDlgTitle">
+  <div class="ds-dialog__block">
+    <h2 class="ds-heading" data-size="sm" id="scanDlgTitle">Skann strekkode</h2>
+  </div>
+  <div class="ds-dialog__block myday-form">
+    <div class="myday-scan">
+      <video id="scanVideo" playsinline muted autoplay></video>
+      <span class="myday-scan__frame" aria-hidden="true"></span>
+    </div>
+    <p class="ds-paragraph" data-size="sm" data-variant="short" id="scanStatus" aria-live="polite">Hold strekkoden inne i rammen.</p>
+    <div class="myday-actions">
+      <button class="ds-button" type="button" data-variant="secondary" id="scanCancel">Avbryt</button>
+    </div>
   </div>
 </dialog>
 

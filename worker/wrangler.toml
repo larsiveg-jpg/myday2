@@ -1,0 +1,6 @@
+# Valgfritt: for å publisere med Wrangler i stedet for å lime inn i dashbordet.
+#   npx wrangler deploy
+#   npx wrangler secret put KASSAL_KEY
+name = "myday-priser"
+main = "worker.js"
+compatibility_date = "2026-11-01"

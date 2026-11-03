@@ -1,9 +1,9 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence }
   from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
-import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot }
+import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot }
   from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
-import { firebaseConfig, enturClientName } from "./config.js?v=20261103-13";
+import { firebaseConfig, enturClientName, priceApi } from "./config.js?v=20261103-14";
 
 /* ---------- Hjelpere ---------- */
 const $ = id => document.getElementById(id);
@@ -25,7 +25,7 @@ const ICON_STAR = '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6
 const today = new Date(); today.setHours(0, 0, 0, 0);
 let viewMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 let selected = iso(today);
-let events = [], shop = [], stops = [];
+let events = [], shop = [], stops = [], products = new Map();
 let me = null, unsubs = [];
 
 $("todayLbl").textContent = "Uke " + isoWeek(today);
@@ -100,7 +100,10 @@ function showApp(user) {
   me = { uid: user.uid, name: user.displayName || (user.email || "").split("@")[0] };
   $("v-login").hidden = true; $("nav").hidden = false; $("signoutRow").hidden = false;
   listen("events", a => events = a, () => { renderCal(); renderDay(); renderHome(); });
-  listen("shopping", a => shop = a, renderShop);
+  listen("shopping", a => shop = a, () => { renderShop(); refreshPrices(); });
+  if (pricesOn) unsubs.push(onSnapshot(collection(db, "products"), snap => {
+    products = new Map(snap.docs.map(d => [d.id, d.data()]));
+  }, () => {}));
   listen("stops", a => stops = a, () => { renderStops(); renderHome(); refreshDepartures(); });
   renderCal(); renderDay(); renderShop(); renderStops(); renderHome();
   showTab();
@@ -215,33 +218,36 @@ function openNewEvent(placement) {
 }
 $("openNew").onclick = () => openNewEvent("bottom");
 
-// Hold dialogen innenfor den synlige delen av skjermen, over tastaturet.
+// Hold dialoger med .myday-kbfit innenfor den synlige delen av skjermen, over tastaturet.
 // Plasseringen regnes fra toppen av visualViewport (offsetTop + height). Det er
 // stabilt på iOS, der window.innerHeight av og til krymper sammen med tastaturet.
 // Mens dialogen er åpen sjekkes plasseringen hver frame, fordi iOS ikke alltid
 // sender resize-hendelser når tastaturet åpnes for andre gang.
 const vv = window.visualViewport;
-let fitLoop = 0, lastFit = "";
-function fitDialogToViewport() {
-  if (!vv || !dlg.open) return;
-  const vTop = vv.offsetTop, vH = vv.height;
-  dlg.style.setProperty("--myday-vv-height", vH + "px");
-  const h = Math.min(dlg.offsetHeight, vH);
-  const top = dlg.getAttribute("data-placement") === "bottom" ? vTop + vH - h : vTop + Math.max(0, (vH - h) / 2);
-  const key = Math.round(top) + "/" + Math.round(vH);
-  if (key === lastFit) return;
-  lastFit = key;
-  dlg.style.setProperty("--myday-vv-top", Math.round(top) + "px");
+function keepAboveKeyboard(d) {
+  let loop = 0, last = "";
+  const fit = () => {
+    if (!vv || !d.open) return;
+    const vTop = vv.offsetTop, vH = vv.height;
+    d.style.setProperty("--myday-vv-height", vH + "px");
+    const h = Math.min(d.offsetHeight, vH);
+    const top = d.getAttribute("data-placement") === "bottom" ? vTop + vH - h : vTop + Math.max(0, (vH - h) / 2);
+    const key = Math.round(top) + "/" + Math.round(vH);
+    if (key === last) return;
+    last = key;
+    d.style.setProperty("--myday-vv-top", Math.round(top) + "px");
+  };
+  d.addEventListener("close", () => {
+    cancelAnimationFrame(loop); last = "";
+    ["--myday-vv-top", "--myday-vv-height"].forEach(k => d.style.removeProperty(k));
+  });
+  return () => {
+    cancelAnimationFrame(loop); last = "";
+    const tick = () => { if (!d.open) return; fit(); loop = requestAnimationFrame(tick); };
+    tick();
+  };
 }
-function startFitLoop() {
-  cancelAnimationFrame(fitLoop); lastFit = "";
-  const tick = () => { if (!dlg.open) return; fitDialogToViewport(); fitLoop = requestAnimationFrame(tick); };
-  tick();
-}
-dlg.addEventListener("close", () => {
-  cancelAnimationFrame(fitLoop); lastFit = "";
-  ["--myday-vv-top", "--myday-vv-height"].forEach(k => dlg.style.removeProperty(k));
-});
+const startFitLoop = keepAboveKeyboard(dlg);
 $("cancelNew").onclick = () => dlg.close();
 let dlgOpenedAt = 0;
 // ignorer klikket som kommer når fingeren slippes rett etter trykk-og-hold
@@ -269,6 +275,14 @@ $("evForm").addEventListener("submit", async ev => {
 });
 
 /* ---------- Handleliste ---------- */
+const pricesOn = !!priceApi;
+const fmtKr = new Intl.NumberFormat("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const kr = n => fmtKr.format(n) + " kr";
+const ICON_TAG = '<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z" stroke-linejoin="round"/><circle cx="8" cy="8" r="1.5"/>';
+// Nøkkel for å huske hvilket produkt en tekst betyr («Melk » → «melk»)
+const productKey = t => t.toLowerCase().trim().replace(/\s+/g, " ").replace(/\//g, "-").slice(0, 120);
+const PRICE_MAX_AGE = 12 * 60 * 60 * 1000;
+
 function renderShop() {
   const ul = $("shopList"); ul.textContent = "";
   const items = [...shop].sort((a, b) => (a.done - b.done) || (a.createdAt - b.createdAt));
@@ -277,6 +291,7 @@ function renderShop() {
   $("navBadge").hidden = !left; $("navBadge").setAttribute("data-count", String(left));
   $("navCountSr").textContent = left ? ", " + left + " varer igjen" : "";
   $("clearRow").hidden = !shop.some(s => s.done);
+  renderSum();
   if (!items.length) { ul.appendChild(emptyLi("Listen er tom. Skriv inn en vare over.")); return; }
   items.forEach(s => {
     const li = document.createElement("li"); li.className = "myday-item"; if (s.done) li.setAttribute("data-done", "");
@@ -285,23 +300,245 @@ function renderShop() {
     cb.onchange = () => patch("shopping", s.id, { done: cb.checked });
     const lb = document.createElement("label"); lb.htmlFor = cb.id; lb.textContent = s.text;
     f.append(cb, lb);
-    const w = who(s); if (w && w !== "deg") { const d = document.createElement("p"); d.setAttribute("data-field", "description"); d.textContent = "Lagt til av " + w; f.appendChild(d); }
-    li.append(f, iconBtn("Fjern " + s.text, b => remove("shopping", s.id, b)));
+    const notes = [];
+    if (s.product && s.product.toLowerCase() !== s.text.toLowerCase()) notes.push(s.product);
+    const w = who(s); if (w && w !== "deg") notes.push("Lagt til av " + w);
+    if (notes.length) { const d = document.createElement("p"); d.setAttribute("data-field", "description"); d.textContent = notes.join(" · "); f.appendChild(d); }
+    li.appendChild(f);
+    if (pricesOn) li.appendChild(priceBtn(s));
+    li.appendChild(iconBtn("Fjern " + s.text, b => remove("shopping", s.id, b)));
     ul.appendChild(li);
   });
 }
+function priceBtn(s) {
+  const b = document.createElement("button"); b.type = "button"; b.className = "ds-button myday-price";
+  b.setAttribute("data-variant", "tertiary"); b.setAttribute("data-size", "sm");
+  if (s.ean && typeof s.price === "number") {
+    b.textContent = kr(s.price); b.setAttribute("aria-label", s.text + ", " + kr(s.price) + ". Endre vare");
+  } else if (s.ean) {
+    b.textContent = "Ingen pris"; b.setAttribute("aria-label", s.text + " finnes ikke hos Rema 1000. Endre vare");
+  } else {
+    b.setAttribute("data-icon", ""); b.setAttribute("data-color", "neutral");
+    b.setAttribute("aria-label", "Finn pris for " + s.text); b.innerHTML = svg(ICON_TAG);
+  }
+  b.onclick = () => openProductPicker(s);
+  return b;
+}
+function renderSum() {
+  const box = $("shopSum");
+  if (!pricesOn || !shop.length) { box.hidden = true; return; }
+  const priced = shop.filter(s => typeof s.price === "number");
+  box.hidden = false;
+  $("shopSumTotal").textContent = kr(priced.reduce((t, s) => t + s.price, 0));
+  const missing = shop.length - priced.length;
+  $("shopSumNote").textContent = missing
+    ? `${priced.length} av ${shop.length} varer har pris. Trykk på merkelappen for å finne flere.`
+    : "Alle varene har pris. Prisanslag fra Kassalapp.";
+}
+
 $("shopForm").addEventListener("submit", async ev => {
   ev.preventDefault();
   const parts = $("shopText").value.split(",").map(s => s.trim()).filter(Boolean);
   if (!parts.length) return;
   $("shopText").value = "";
-  for (const text of parts) await add("shopping", { text, done: false });
+  for (const text of parts) {
+    const known = products.get(productKey(text));
+    await add("shopping", known && known.ean
+      ? { text, done: false, ean: known.ean, product: known.name || "", price: known.price ?? null, priceAt: known.priceAt || 0 }
+      : { text, done: false });
+  }
   $("shopText").focus();
 });
 $("clearDone").onclick = async () => {
   const btn = $("clearDone"); btn.setAttribute("aria-busy", "true");
   for (const s of shop.filter(s => s.done)) await remove("shopping", s.id);
   btn.removeAttribute("aria-busy");
+};
+
+/* ---------- Priser (Kassalapp via prisstasjonen) ---------- */
+async function priceGet(path) {
+  const token = await auth.currentUser.getIdToken();
+  const res = await fetch(priceApi.replace(/\/$/, "") + path, { headers: { Authorization: "Bearer " + token } });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || "Prisstasjonen svarte ikke");
+  return body;
+}
+function rememberProduct(text, item) {
+  if (!item) return;
+  setDoc(doc(db, "products", productKey(text)), {
+    ean: item.ean, name: item.name || "", price: item.price ?? null, priceAt: Date.now(), by: me.uid,
+  }).catch(() => {});
+}
+async function linkItem(s, item) {
+  await patch("shopping", s.id, { ean: item.ean, product: item.name || "", price: item.price ?? null, priceAt: Date.now() });
+  rememberProduct(s.text, item);
+}
+
+// Oppfrisk priser som er eldre enn 12 timer (én gang per økt per vare)
+const pricing = new Set();
+async function refreshPrices() {
+  if (!pricesOn || !me) return;
+  const stale = shop.filter(s => s.ean && !pricing.has(s.ean) && Date.now() - (s.priceAt || 0) > PRICE_MAX_AGE);
+  const eans = [...new Set(stale.map(s => s.ean))].slice(0, 30);
+  if (!eans.length) return;
+  eans.forEach(e => pricing.add(e));
+  try {
+    const { prices } = await priceGet("/prices?ean=" + eans.join(","));
+    for (const s of stale) {
+      if (!(s.ean in prices)) continue;
+      patch("shopping", s.id, { price: prices[s.ean], priceAt: Date.now() });
+      const k = productKey(s.text), p = products.get(k);
+      if (p && p.ean === s.ean) setDoc(doc(db, "products", k), { ...p, price: prices[s.ean], priceAt: Date.now() }).catch(() => {});
+    }
+  } catch { /* prøver igjen neste gang appen åpnes */ }
+}
+
+/* ---------- Velg produkt ---------- */
+const prodDlg = $("prodDlg");
+const startProdFit = keepAboveKeyboard(prodDlg);
+let prodFor = null, prodTimer = 0, prodSeq = 0;
+function openProductPicker(s) {
+  prodFor = s;
+  $("prodDlgTitle").textContent = "Finn pris: " + s.text;
+  $("prodSearch").value = s.text;
+  $("prodUnlink").hidden = !s.ean;
+  prodDlg.showModal(); startProdFit();
+  searchProducts(s.text);
+}
+$("prodCancel").onclick = () => prodDlg.close();
+prodDlg.addEventListener("close", () => { prodFor = null; clearTimeout(prodTimer); prodSeq++; });
+$("prodSearch").addEventListener("input", e => {
+  clearTimeout(prodTimer);
+  prodTimer = setTimeout(() => searchProducts(e.target.value), 350);
+});
+$("prodSearch").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); clearTimeout(prodTimer); searchProducts(e.target.value); e.target.blur(); } });
+$("prodUnlink").onclick = async () => {
+  const s = prodFor; if (!s) return;
+  await patch("shopping", s.id, { ean: null, product: null, price: null, priceAt: null });
+  deleteDoc(doc(db, "products", productKey(s.text))).catch(() => {});
+  prodDlg.close();
+};
+$("prodScan").onclick = async () => {
+  const s = prodFor; if (!s) return;
+  const ean = await scanBarcode(); if (!ean || prodFor !== s) return;
+  $("prodStatus").textContent = "Henter vare …";
+  try {
+    const { item } = await priceGet("/ean/" + ean);
+    if (!item) { $("prodStatus").textContent = "Fant ikke strekkoden " + ean + " hos Kassalapp."; return; }
+    await linkItem(s, item); prodDlg.close();
+  } catch (e) { $("prodStatus").textContent = e.message; }
+};
+
+async function searchProducts(q) {
+  q = q.trim();
+  const ul = $("prodResults"), st = $("prodStatus");
+  if (q.length < 2) { ul.textContent = ""; st.textContent = "Skriv minst to bokstaver."; return; }
+  const seq = ++prodSeq;
+  st.textContent = "Søker …";
+  try {
+    const { items } = await priceGet("/search?q=" + encodeURIComponent(q));
+    if (seq !== prodSeq) return;
+    ul.textContent = "";
+    st.textContent = items.length ? "" : "Fant ingen varer hos Rema 1000. Prøv et annet ord, eller skann strekkoden.";
+    items.forEach(item => {
+      const li = document.createElement("li");
+      const b = document.createElement("button"); b.type = "button"; b.className = "myday-product ds-focus";
+      if (prodFor && prodFor.ean === item.ean) b.setAttribute("aria-current", "true");
+      const img = document.createElement("img"); img.alt = ""; img.loading = "lazy"; img.decoding = "async";
+      if (item.image) img.src = item.image; else img.hidden = true;
+      const txt = document.createElement("span"); txt.className = "myday-product__name";
+      txt.textContent = item.name;
+      if (item.brand) { const sm = document.createElement("small"); sm.textContent = item.brand; txt.appendChild(sm); }
+      const pr = document.createElement("span"); pr.className = "myday-product__price"; pr.textContent = kr(item.price);
+      if (item.unitPrice && item.unit) { const sm = document.createElement("small"); sm.textContent = kr(item.unitPrice) + "/" + item.unit; pr.appendChild(sm); }
+      b.append(img, txt, pr);
+      b.onclick = async () => { const s = prodFor; if (!s) return; b.disabled = true; await linkItem(s, item); prodDlg.close(); };
+      li.appendChild(b); ul.appendChild(li);
+    });
+  } catch (e) { if (seq === prodSeq) { ul.textContent = ""; st.textContent = e.message; } }
+}
+
+/* ---------- Skann strekkode ---------- */
+const scanDlg = $("scanDlg");
+let scanStop = null;
+const validEan = c => {
+  if (!/^\d{8}$|^\d{12,13}$/.test(c)) return false;
+  const d = c.padStart(14, "0").split("").map(Number);
+  const sum = d.slice(0, 13).reduce((t, n, i) => t + n * (i % 2 ? 1 : 3), 0);
+  return (10 - (sum % 10)) % 10 === d[13];
+};
+function scanBarcode() {
+  return new Promise(async resolve => {
+    let done = false;
+    const video = $("scanVideo"), st = $("scanStatus");
+    const finish = code => {
+      if (done) return; done = true;
+      if (scanStop) { scanStop(); scanStop = null; }
+      if (scanDlg.open) scanDlg.close();
+      resolve(code ? (code.length === 12 ? "0" + code : code) : null);
+    };
+    scanDlg.onclose = () => finish(null);
+    $("scanCancel").onclick = () => finish(null);
+    st.textContent = "Starter kamera …";
+    scanDlg.showModal();
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } }, audio: false });
+    } catch {
+      st.textContent = "Fikk ikke tilgang til kameraet. Gi MyDay lov til å bruke kameraet i innstillingene.";
+      return;
+    }
+    if (done) { stream.getTracks().forEach(t => t.stop()); return; }
+    video.srcObject = stream;
+    await video.play().catch(() => {});
+    st.textContent = "Hold strekkoden inne i rammen.";
+    const stopStream = () => { stream.getTracks().forEach(t => t.stop()); video.srcObject = null; };
+    const onCode = c => { if (validEan(c)) { if (navigator.vibrate) navigator.vibrate(30); finish(c); } };
+
+    let native = null;
+    if ("BarcodeDetector" in window) {
+      try {
+        const fmts = await BarcodeDetector.getSupportedFormats();
+        if (fmts.includes("ean_13")) native = new BarcodeDetector({ formats: ["ean_13", "ean_8", "upc_a"].filter(f => fmts.includes(f)) });
+      } catch {}
+    }
+    if (native) {
+      let t = 0;
+      const tick = async () => {
+        if (done) return;
+        try { const r = await native.detect(video); if (r[0]) onCode(r[0].rawValue); } catch {}
+        t = setTimeout(tick, 150);
+      };
+      scanStop = () => { clearTimeout(t); stopStream(); };
+      tick();
+    } else {
+      try {
+        const { BrowserMultiFormatReader } = await import("https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.1/+esm");
+        if (done) { stopStream(); return; }
+        const controls = await new BrowserMultiFormatReader().decodeFromStream(stream, video, r => { if (r) onCode(r.getText()); });
+        scanStop = () => { controls.stop(); stopStream(); };
+        if (done) scanStop();
+      } catch {
+        scanStop = stopStream;
+        st.textContent = "Strekkodeleseren kunne ikke lastes. Sjekk nettet og prøv igjen.";
+      }
+    }
+  });
+}
+
+$("scanAdd").hidden = !pricesOn;
+$("scanAdd").onclick = async () => {
+  const ean = await scanBarcode(); if (!ean) return;
+  setStatus("Henter vare …", "info");
+  try {
+    const { item } = await priceGet("/ean/" + ean);
+    if (!item) { setStatus("Fant ikke strekkoden " + ean + " hos Kassalapp. Skriv inn varen i stedet.", "warning"); return; }
+    const text = item.name || ean;
+    if (await add("shopping", { text, done: false, ean: item.ean, product: item.name || "", price: item.price ?? null, priceAt: Date.now() })) {
+      rememberProduct(text, item);
+      setStatus("");
+    }
+  } catch (e) { setStatus(e.message, "danger"); }
 };
 
 /* ---------- Entur ---------- */

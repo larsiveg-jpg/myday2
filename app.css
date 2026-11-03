@@ -108,6 +108,49 @@
   .myday-add { display: flex; gap: var(--ds-size-2); align-items: end; }
   .myday-add .ds-field { flex: 1; min-width: 0; }
 
+  /* Priser */
+  .myday-price { flex: none; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .myday-item[data-done] .myday-price:not([data-icon]) { color: var(--ds-color-neutral-text-subtle); }
+  .myday-sum { display: flex; align-items: center; justify-content: space-between; gap: var(--ds-size-3); }
+  .myday-sum .ds-paragraph { margin: 0; }
+  .myday-sum__total { font-weight: var(--ds-font-weight-semibold); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .myday-products { list-style: none; margin: 0; padding: 0; display: grid; }
+  .myday-products li + li { border-block-start: var(--ds-border-width-default) solid var(--ds-color-neutral-border-subtle); }
+  .myday-product {
+    inline-size: 100%; min-block-size: 44px;
+    display: grid; grid-template-columns: var(--ds-size-12) minmax(0, 1fr) auto; gap: var(--ds-size-3); align-items: center;
+    padding: var(--ds-size-2) var(--ds-size-1);
+    border: 0; border-radius: var(--ds-border-radius-md);
+    background: transparent; color: var(--ds-color-neutral-text-default);
+    font: inherit; text-align: start; cursor: pointer;
+  }
+  .myday-product:hover { background: var(--ds-color-neutral-surface-hover); }
+  .myday-product[aria-current="true"] { background: var(--ds-color-accent-surface-tinted); }
+  .myday-product img {
+    inline-size: var(--ds-size-12); block-size: var(--ds-size-12); object-fit: contain;
+    border-radius: var(--ds-border-radius-sm); background: var(--ds-color-neutral-background-default);
+  }
+  .myday-product img[hidden] { display: block; visibility: hidden; }
+  .myday-product__name { min-width: 0; overflow-wrap: anywhere; font-size: var(--ds-body-sm-font-size); line-height: var(--ds-line-height-sm); }
+  .myday-product__name small, .myday-product__price small {
+    display: block; color: var(--ds-color-neutral-text-subtle); font-size: var(--ds-body-xs-font-size); font-weight: var(--ds-font-weight-regular);
+  }
+  .myday-product__price { text-align: end; white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: var(--ds-font-weight-semibold); }
+
+  /* Strekkodeskanner */
+  .myday-scan {
+    position: relative; overflow: hidden; aspect-ratio: 4 / 3;
+    border-radius: var(--ds-border-radius-lg); background: var(--ds-color-neutral-base-default);
+  }
+  .myday-scan video { inline-size: 100%; block-size: 100%; object-fit: cover; display: block; }
+  .myday-scan__frame {
+    position: absolute; inset: 30% 10%;
+    border: var(--ds-border-width-focus) solid var(--ds-color-brand3-base-default);
+    border-radius: var(--ds-border-radius-md);
+    box-shadow: 0 0 0 100vmax color-mix(in srgb, var(--ds-color-neutral-base-default) 45%, transparent);
+  }
+
   /* Holdeplasser og avganger */
   .myday-stop__head { display: flex; align-items: center; gap: var(--ds-size-3); }
   .myday-stop__name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
@@ -144,11 +187,11 @@
 
   /* Ny avtale-dialogen følger den synlige delen av skjermen, så den ligger over tastaturet.
      app.js setter --myday-vv-top (toppkant) og --myday-vv-height (synlig høyde) mens den er åpen. */
-  #newDlg {
+  .myday-kbfit {
     --dsc-dialog-spacing: var(--ds-size-4);
     --dsc-dialog-max-height: calc(var(--myday-vv-height, 100dvh) - var(--ds-size-4));
   }
-  #newDlg[style*="--myday-vv-top"] {
+  .myday-kbfit[style*="--myday-vv-top"] {
     inset-block: var(--myday-vv-top) auto;
     margin-block: 0;
   }
