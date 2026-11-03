@@ -145,6 +145,7 @@
   /* Ny avtale-dialogen følger den synlige delen av skjermen, så den ligger over tastaturet.
      app.js setter --myday-vv-top (toppkant) og --myday-vv-height (synlig høyde) mens den er åpen. */
   #newDlg {
+    --dsc-dialog-spacing: var(--ds-size-4);
     --dsc-dialog-max-height: calc(var(--myday-vv-height, 100dvh) - var(--ds-size-4));
   }
   #newDlg[style*="--myday-vv-top"] {
@@ -154,8 +155,15 @@
 
   /* Dialog-skjema */
   .myday-form { display: grid; gap: var(--ds-size-4); }
-  .myday-dates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ds-size-2); }
-  .myday-dates .ds-input { min-width: 0; width: 100%; }
+  .myday-dates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ds-size-2) var(--ds-size-1); }
+  .myday-dates .ds-input {
+    min-width: 0; width: 100%;
+    font-size: var(--ds-body-xs-font-size);
+    padding-inline: var(--ds-size-2) var(--ds-size-1);
+    white-space: nowrap;
+  }
+  .myday-dates .ds-input::-webkit-calendar-picker-indicator { margin-inline-start: 0; padding: 0; inline-size: 1em; block-size: 1em; }
+  .myday-dates .ds-input::-webkit-datetime-edit { padding: 0; }
   .myday-actions { display: flex; gap: var(--ds-size-2); justify-content: flex-end; flex-wrap: wrap; }
 
   /* Bunnavigasjon */
