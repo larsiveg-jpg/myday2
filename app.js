@@ -3,7 +3,7 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPe
   from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot }
   from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
-import { firebaseConfig, enturClientName } from "./config.js?v=20261103-4";
+import { firebaseConfig, enturClientName } from "./config.js?v=20261103-5";
 
 /* ---------- Hjelpere ---------- */
 const $ = id => document.getElementById(id);
@@ -28,7 +28,7 @@ let selected = iso(today);
 let events = [], shop = [], stops = [];
 let me = null, unsubs = [];
 
-$("todayLbl").textContent = fmtLong.format(today) + " · uke " + isoWeek(today);
+$("todayLbl").textContent = "Uke " + isoWeek(today);
 
 function setStatus(msg, color = "warning") {
   $("status").hidden = !msg; $("statusText").textContent = msg || "";
