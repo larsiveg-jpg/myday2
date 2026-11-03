@@ -142,6 +142,17 @@
   .myday-fav[aria-pressed="true"] { color: var(--ds-color-brand3-text-default); }
   .myday-fav[aria-pressed="true"] svg { fill: var(--ds-color-brand3-base-default); }
 
+  /* Ny avtale-dialogen følger den synlige delen av skjermen, så den ligger over tastaturet */
+  #newDlg {
+    inset-block-start: var(--myday-vv-top, 0px);
+    inset-block-end: var(--myday-vv-bottom, 0px);
+    --dsc-dialog-max-height: calc(var(--myday-vv-height, 100dvh) - var(--ds-size-4));
+  }
+  #newDlg[data-placement="bottom"] { inset-block-start: auto; }
+  @media (prefers-reduced-motion: no-preference) {
+    #newDlg { transition: inset-block-end .15s ease-out, inset-block-start .15s ease-out; }
+  }
+
   /* Dialog-skjema */
   .myday-form { display: grid; gap: var(--ds-size-4); }
   .myday-dates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ds-size-2); }

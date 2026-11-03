@@ -3,7 +3,7 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPe
   from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot }
   from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
-import { firebaseConfig, enturClientName } from "./config.js?v=20261103-10";
+import { firebaseConfig, enturClientName } from "./config.js?v=20261103-11";
 
 /* ---------- Hjelpere ---------- */
 const $ = id => document.getElementById(id);
@@ -211,9 +211,24 @@ function openNewEvent(placement) {
   $("evEnd").value = ""; syncEndMin();
   dlg.setAttribute("data-placement", placement);
   dlgOpenedAt = Date.now();
-  dlg.showModal(); $("evTitle").focus();
+  dlg.showModal(); fitDialogToViewport(); $("evTitle").focus();
 }
 $("openNew").onclick = () => openNewEvent("bottom");
+
+// Hold dialogen innenfor den synlige delen av skjermen, over tastaturet.
+// visualViewport krymper når tastaturet åpnes (iOS endrer ikke selve layout-høyden).
+const vv = window.visualViewport;
+function fitDialogToViewport() {
+  if (!vv || !dlg.open) return;
+  const top = Math.max(0, vv.offsetTop);
+  const bottom = Math.max(0, window.innerHeight - vv.offsetTop - vv.height);
+  dlg.style.setProperty("--myday-vv-top", top + "px");
+  dlg.style.setProperty("--myday-vv-bottom", bottom + "px");
+  dlg.style.setProperty("--myday-vv-height", vv.height + "px");
+}
+if (vv) { vv.addEventListener("resize", fitDialogToViewport); vv.addEventListener("scroll", fitDialogToViewport); }
+dlg.addEventListener("focusin", () => requestAnimationFrame(fitDialogToViewport));
+dlg.addEventListener("close", () => ["--myday-vv-top", "--myday-vv-bottom", "--myday-vv-height"].forEach(k => dlg.style.removeProperty(k)));
 $("cancelNew").onclick = () => dlg.close();
 let dlgOpenedAt = 0;
 // ignorer klikket som kommer når fingeren slippes rett etter trykk-og-hold
