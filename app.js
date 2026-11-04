@@ -3,7 +3,7 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPe
   from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot }
   from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
-import { firebaseConfig, enturClientName, priceApi } from "./config.js?v=20261104-4";
+import { firebaseConfig, enturClientName, priceApi } from "./config.js?v=20261104-5";
 
 /* ---------- Hjelpere ---------- */
 const $ = id => document.getElementById(id);
@@ -77,7 +77,7 @@ function listen(col, assign, after) {
 }
 
 /* ---------- Visninger ---------- */
-const tabs = ["hjem", "kalender", "handleliste", "avganger"];
+const tabs = ["hjem", "kalender", "handleliste", "avganger", "reisetid"];
 function currentTab() { return tabs.includes(location.hash.slice(1)) ? location.hash.slice(1) : "hjem"; }
 const showsDepartures = () => ["hjem", "avganger"].includes(currentTab());
 function showTab() {
@@ -87,6 +87,7 @@ function showTab() {
   document.querySelectorAll(".myday-bottom-nav a").forEach(a => a.dataset.tab === t ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current"));
   if (t === "hjem") renderHome();
   if (showsDepartures()) refreshDepartures();
+  if (t === "reisetid") { renderTravelFrom(); renderTravel(); refreshTravel(); }
 }
 addEventListener("hashchange", showTab);
 
@@ -103,7 +104,7 @@ function showApp(user) {
   if (pricesOn) unsubs.push(onSnapshot(collection(db, "products"), snap => {
     products = new Map(snap.docs.map(d => [d.id, d.data()]));
   }, () => {}));
-  listen("stops", a => stops = a, () => { renderStops(); renderHome(); refreshDepartures(); });
+  listen("stops", a => stops = a, () => { renderStops(); renderHome(); refreshDepartures(); renderTravelFrom(); renderTravel(); });
   renderCal(); renderDay(); renderShop(); renderStops(); renderHome();
   showTab();
 }
@@ -769,6 +770,195 @@ async function searchStops(q) {
     });
   } catch (e) {
     if (seq !== searchSeq) return;
+    ul.textContent = ""; ul.appendChild(emptyLi("Søket feilet. Sjekk nettet og prøv igjen."));
+  }
+}
+
+/* ---------- Reisetid (test) ---------- */
+// Valgene lagres bare på denne telefonen: { fromId, toId, toName, lines: [linje-id] }
+const RT_KEY = "myday.reisetid";
+let rt = (() => { try { return JSON.parse(localStorage.getItem(RT_KEY)) || {}; } catch { return {}; } })();
+if (!Array.isArray(rt.lines)) rt.lines = [];
+const saveRt = () => { try { localStorage.setItem(RT_KEY, JSON.stringify(rt)); } catch {} };
+let rtData = null, rtBusy = false, rtSeq = 0;
+
+const RT_DEP_QUERY = `query($id: String!) {
+  stopPlace(id: $id) {
+    estimatedCalls(timeRange: 10800, numberOfDepartures: 20, includeCancelledTrips: true) {
+      date stopPositionInPattern cancellation realtime aimedDepartureTime expectedDepartureTime
+      destinationDisplay { frontText }
+      serviceJourney { id line { id publicCode transportMode presentation { colour textColour } } }
+    }
+  }
+}`;
+const RT_CALLS = `estimatedCalls(date: $d) { stopPositionInPattern cancellation realtime aimedArrivalTime expectedArrivalTime quay { stopPlace { id parent { id } } } }`;
+
+async function entur(query, variables) {
+  const r = await fetch("https://api.entur.io/journey-planner/v3/graphql", {
+    method: "POST", headers: { "Content-Type": "application/json", ...ENTUR_HEADERS },
+    body: JSON.stringify({ query, variables }),
+  });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  const j = await r.json();
+  if (!j.data) throw new Error((j.errors && j.errors[0] && j.errors[0].message) || "Entur svarte ikke");
+  return j.data;
+}
+
+function rtFromId() {
+  const valid = stops.filter(s => s.enturId);
+  if (rt.fromId && valid.some(s => s.enturId === rt.fromId)) return rt.fromId;
+  const fav = favoriteStop(); return fav ? fav.enturId : null;
+}
+
+async function fetchTravel(fromId, toId) {
+  const calls = ((await entur(RT_DEP_QUERY, { id: fromId })).stopPlace || {}).estimatedCalls || [];
+  if (!calls.length) return [];
+  // Hent hele turen for hver avgang (én spørring med alias per tur)
+  const vars = {}, parts = [], defs = [];
+  calls.forEach((c, i) => {
+    defs.push(`$j${i}: String!, $d${i}: Date`);
+    parts.push(`t${i}: serviceJourney(id: $j${i}) { ${RT_CALLS.replace("$d", "$d" + i)} }`);
+    vars["j" + i] = c.serviceJourney.id; vars["d" + i] = c.date;
+  });
+  const trips = await entur(`query(${defs.join(", ")}) { ${parts.join(" ")} }`, vars);
+  const rows = [];
+  calls.forEach((c, i) => {
+    const trip = trips["t" + i]; if (!trip) return;
+    const hit = trip.estimatedCalls.find(x => x.stopPositionInPattern > c.stopPositionInPattern && x.quay && x.quay.stopPlace &&
+      (x.quay.stopPlace.id === toId || (x.quay.stopPlace.parent && x.quay.stopPlace.parent.id === toId)));
+    if (!hit) return;
+    const dep = new Date(c.expectedDepartureTime), arr = new Date(hit.expectedArrivalTime);
+    rows.push({
+      line: c.serviceJourney.line, front: (c.destinationDisplay && c.destinationDisplay.frontText) || "",
+      dep, aimDep: new Date(c.aimedDepartureTime), arr, aimArr: new Date(hit.aimedArrivalTime),
+      minutes: Math.max(0, Math.round((arr - dep) / 60000)),
+      realtime: c.realtime || hit.realtime, cancelled: c.cancellation || hit.cancellation,
+    });
+  });
+  return rows;
+}
+
+async function refreshTravel() {
+  if (rtBusy || !me || currentTab() !== "reisetid" || document.hidden) return;
+  const fromId = rtFromId();
+  if (!fromId || !rt.toId) { rtData = null; renderTravel(); return; }
+  rtBusy = true; const seq = ++rtSeq; const key = fromId + ">" + rt.toId;
+  try { const rows = await fetchTravel(fromId, rt.toId); if (seq === rtSeq) rtData = { key, rows, at: new Date() }; }
+  catch (e) { if (seq === rtSeq) rtData = { ...(rtData && rtData.key === key ? rtData : { key }), error: true }; }
+  rtBusy = false;
+  renderTravel();
+}
+setInterval(refreshTravel, 30000);
+document.addEventListener("visibilitychange", refreshTravel);
+
+function renderTravelFrom() {
+  const sel = $("rtFrom"), cur = rtFromId();
+  const valid = stops.filter(s => s.enturId).sort((a, b) => a.createdAt - b.createdAt);
+  sel.textContent = "";
+  if (!valid.length) { const o = document.createElement("option"); o.textContent = "Lagre en holdeplass under Avganger først"; o.value = ""; sel.appendChild(o); sel.disabled = true; return; }
+  sel.disabled = false;
+  valid.forEach(s => { const o = document.createElement("option"); o.value = s.enturId; o.textContent = s.name; if (s.enturId === cur) o.selected = true; sel.appendChild(o); });
+}
+$("rtFrom").addEventListener("change", e => { rt.fromId = e.target.value; rt.lines = []; saveRt(); rtData = null; renderTravel(); refreshTravel(); });
+
+function renderTravel() {
+  const fromId = rtFromId(), from = stops.find(s => s.enturId === fromId);
+  const ul = $("rtList"), sum = $("rtSummary"), upd = $("rtUpdated"), box = $("rtLinesBox"), chips = $("rtLines");
+  if (document.activeElement !== $("rtTo")) $("rtTo").value = rt.toName || "";
+  $("rtTitle").textContent = from && rt.toName ? from.name + " → " + rt.toName : "Reisetid";
+  ul.textContent = ""; sum.textContent = ""; upd.textContent = "";
+  if (!fromId) { box.hidden = true; ul.appendChild(emptyLi("Lagre en holdeplass under Avganger, så kan du velge den her.")); return; }
+  if (!rt.toId) { box.hidden = true; ul.appendChild(emptyLi("Velg hvor du skal, så vises kjøretid for avgangene som går dit.")); return; }
+  const d = rtData && rtData.key === fromId + ">" + rt.toId ? rtData : null;
+  if (!d || (!d.rows && !d.error)) {
+    box.hidden = true;
+    for (let i = 0; i < 3; i++) { const li = document.createElement("li"); li.innerHTML = '<span class="ds-skeleton" data-variant="text" aria-hidden="true"></span>'; ul.appendChild(li); }
+    return;
+  }
+  if (d.error && !d.rows) { box.hidden = true; ul.appendChild(emptyLi("Fikk ikke hentet reisetid. Prøver igjen om litt.")); return; }
+
+  // Linjevalg: linjer som går dit, pluss valgte som ikke vises akkurat nå
+  const lines = new Map();
+  d.rows.forEach(r => { if (r.line && !lines.has(r.line.id)) lines.set(r.line.id, r.line); });
+  rt.lines.forEach(id => { if (!lines.has(id)) lines.set(id, { id, publicCode: id.split(":").pop() }); });
+  chips.textContent = "";
+  [...lines.values()].sort((a, b) => String(a.publicCode).localeCompare(String(b.publicCode), "nb", { numeric: true })).forEach(l => {
+    const lab = document.createElement("label"); lab.className = "ds-chip";
+    const inp = document.createElement("input"); inp.type = "checkbox"; inp.value = l.id; inp.checked = rt.lines.includes(l.id);
+    inp.onchange = () => { rt.lines = inp.checked ? [...rt.lines, l.id] : rt.lines.filter(x => x !== l.id); saveRt(); renderTravel(); };
+    lab.append(inp, document.createTextNode((MODES[l.transportMode] ? MODES[l.transportMode] + " " : "Linje ") + (l.publicCode || "")));
+    chips.appendChild(lab);
+  });
+  box.hidden = lines.size < 2 && !rt.lines.length;
+
+  const rows = d.rows.filter(r => r.dep > Date.now() - 60000 && (!rt.lines.length || rt.lines.includes(r.line.id))).slice(0, 8);
+  if (!rows.length) {
+    ul.appendChild(emptyLi(d.rows.length ? "Ingen av de valgte linjene går dit de neste timene." : "Fant ingen direkte avganger dit de neste tre timene."));
+  } else {
+    const mins = rows.filter(r => !r.cancelled).map(r => r.minutes);
+    if (mins.length) {
+      const lo = Math.min(...mins), hi = Math.max(...mins);
+      sum.textContent = "Kjøretid nå: " + (lo === hi ? lo : lo + "–" + hi) + " min";
+    }
+    rows.forEach(r => {
+      const li = document.createElement("li"); li.className = "myday-departure";
+      if (r.cancelled) li.setAttribute("data-cancelled", "");
+      const ln = document.createElement("span"); ln.className = "myday-line"; ln.textContent = r.line.publicCode || "–";
+      applyLineColour(ln, r.line.presentation);
+      ln.setAttribute("aria-label", (MODES[r.line.transportMode] || "Linje") + " " + (r.line.publicCode || ""));
+      const dest = document.createElement("span"); dest.className = "myday-departure__dest"; dest.textContent = r.front;
+      const sub = document.createElement("small");
+      const late = Math.round((r.dep - r.aimDep) / 60000);
+      const rel = minutesText(r.dep);
+      sub.textContent = "Går " + fmtClock.format(r.dep) + (rel.includes(":") ? "" : " (" + rel.toLowerCase() + ")") + (late >= 2 ? ", " + late + " min forsinket" : "") + (r.realtime ? "" : ", rutetid");
+      dest.appendChild(sub);
+      if (r.cancelled) {
+        const tag = document.createElement("span"); tag.className = "ds-tag"; tag.setAttribute("data-color", "danger"); tag.setAttribute("data-size", "sm"); tag.textContent = "Innstilt";
+        dest.appendChild(tag);
+      }
+      const tm = document.createElement("span"); tm.className = "myday-departure__time";
+      tm.textContent = r.minutes + " min";
+      const small = document.createElement("small"); small.textContent = "fremme " + fmtClock.format(r.arr);
+      tm.appendChild(small);
+      li.append(ln, dest, tm); ul.appendChild(li);
+    });
+  }
+  if (d.at) upd.textContent = "Oppdatert " + fmtClock.format(d.at) + (d.error ? ", siste forsøk feilet" : "");
+}
+
+/* Søk etter reisemål */
+let rtTimer, rtSearchSeq = 0;
+$("rtTo").addEventListener("input", () => {
+  clearTimeout(rtTimer);
+  const q = $("rtTo").value.trim();
+  if (q.length < 2) { $("rtToResults").textContent = ""; return; }
+  rtTimer = setTimeout(() => searchTravelTo(q), 300);
+});
+$("rtTo").addEventListener("blur", () => setTimeout(() => { if (!$("rtToResults").contains(document.activeElement)) { $("rtToResults").textContent = ""; $("rtTo").value = rt.toName || ""; } }, 200));
+async function searchTravelTo(q) {
+  const seq = ++rtSearchSeq, ul = $("rtToResults");
+  try {
+    const url = "https://api.entur.io/geocoder/v1/autocomplete?" + new URLSearchParams({ text: q, size: "6", layers: "venue", lang: "no" });
+    const j = await (await fetch(url, { headers: ENTUR_HEADERS })).json();
+    if (seq !== rtSearchSeq) return;
+    ul.textContent = "";
+    const feats = (j.features || []).filter(f => f.properties && String(f.properties.id).startsWith("NSR:StopPlace"));
+    if (!feats.length) { ul.appendChild(emptyLi("Fant ingen holdeplasser.")); return; }
+    feats.forEach(f => {
+      const p = f.properties;
+      const li = document.createElement("li");
+      const b = document.createElement("button"); b.type = "button"; b.className = "ds-button"; b.setAttribute("data-variant", "tertiary");
+      const place = [p.locality, p.county].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(", ");
+      b.textContent = p.name + (place ? " · " + place : "");
+      b.onclick = () => {
+        rt.toId = p.id; rt.toName = p.name; rt.lines = []; saveRt();
+        ul.textContent = ""; $("rtTo").value = p.name; $("rtTo").blur();
+        rtData = null; renderTravel(); refreshTravel();
+      };
+      li.appendChild(b); ul.appendChild(li);
+    });
+  } catch (e) {
+    if (seq !== rtSearchSeq) return;
     ul.textContent = ""; ul.appendChild(emptyLi("Søket feilet. Sjekk nettet og prøv igjen."));
   }
 }

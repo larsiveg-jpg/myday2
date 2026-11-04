@@ -196,6 +196,7 @@
 
   /* Dialog-skjema */
   .myday-form { display: grid; gap: var(--ds-size-4); }
+  .myday-chips { display: flex; flex-wrap: wrap; gap: var(--ds-size-2); }
   .myday-dates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ds-size-2) var(--ds-size-1); }
   .myday-dates .ds-input {
     min-width: 0; width: 100%;
@@ -210,10 +211,10 @@
   /* Bunnavigasjon */
   .myday-bottom-nav {
     position: fixed; inset-inline: 0; inset-block-end: 0; z-index: 6;
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--ds-size-1);
+    display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--ds-size-1);
     padding-block: var(--ds-size-2) calc(var(--ds-size-2) + env(safe-area-inset-bottom, 0px));
-    padding-left: max(var(--ds-size-4), env(safe-area-inset-left, 0px));
-    padding-right: max(var(--ds-size-4), env(safe-area-inset-right, 0px));
+    padding-left: max(var(--ds-size-2), env(safe-area-inset-left, 0px));
+    padding-right: max(var(--ds-size-2), env(safe-area-inset-right, 0px));
     background: var(--ds-color-neutral-background-default);
     border-block-start: var(--ds-border-width-default) solid var(--ds-color-neutral-border-subtle);
   }
@@ -223,6 +224,12 @@
     color: var(--ds-color-neutral-text-subtle);
     font-size: var(--ds-body-xs-font-size); font-weight: var(--ds-font-weight-medium);
     padding-block: var(--ds-size-1);
+    min-width: 0; letter-spacing: -0.01em;
+  }
+  .myday-bottom-nav a > span:last-child, .myday-bottom-nav a { overflow-wrap: normal; }
+  @media (max-width: 400px) {
+    .myday-bottom-nav { gap: 0; }
+    .myday-bottom-nav a { font-size: calc(var(--ds-body-xs-font-size) * 0.86); }
   }
   .myday-bottom-nav a[aria-current="page"] { color: var(--ds-color-accent-text-default); background: var(--ds-color-accent-surface-tinted); }
   .myday-bottom-nav svg { width: var(--ds-size-6); height: var(--ds-size-6); }
