@@ -3,7 +3,7 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPe
   from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot }
   from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
-import { firebaseConfig, enturClientName, priceApi } from "./config.js?v=20261104-1";
+import { firebaseConfig, enturClientName, priceApi } from "./config.js?v=20261104-2";
 
 /* ---------- Hjelpere ---------- */
 const $ = id => document.getElementById(id);
@@ -316,7 +316,7 @@ function priceBtn(s) {
   if (s.ean && typeof s.price === "number") {
     b.textContent = kr(s.price); b.setAttribute("aria-label", s.text + ", " + kr(s.price) + ". Endre vare");
   } else if (s.ean) {
-    b.textContent = "Ingen pris"; b.setAttribute("aria-label", s.text + " finnes ikke hos Rema 1000. Endre vare");
+    b.textContent = "Ingen pris"; b.setAttribute("aria-label", s.text + " finnes ikke hos Oda. Endre vare");
   } else {
     b.setAttribute("data-icon", ""); b.setAttribute("data-color", "neutral");
     b.setAttribute("aria-label", "Finn pris for " + s.text); b.innerHTML = svg(ICON_TAG);
@@ -439,7 +439,7 @@ async function searchProducts(q) {
     const { items } = await priceGet("/search?q=" + encodeURIComponent(q));
     if (seq !== prodSeq) return;
     ul.textContent = "";
-    st.textContent = items.length ? "" : "Fant ingen varer hos Rema 1000. Prøv et annet ord, eller skann strekkoden.";
+    st.textContent = items.length ? "" : "Fant ingen varer hos Oda. Prøv et annet ord, eller skann strekkoden.";
     items.forEach(item => {
       const li = document.createElement("li");
       const b = document.createElement("button"); b.type = "button"; b.className = "myday-product ds-focus";

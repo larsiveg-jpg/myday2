@@ -1,6 +1,6 @@
 // MyDay 2.0 – prisstasjon (Cloudflare Worker)
 //
-// Holder Kassalapp-nøkkelen hemmelig og gir appen Rema 1000-priser.
+// Holder Kassalapp-nøkkelen hemmelig og gir appen priser fra Oda.
 // Bare innloggede MyDay-brukere (Firebase) slipper inn.
 //
 // Hemmelighet (Settings → Variables and Secrets):
@@ -15,7 +15,8 @@ const FIREBASE_PROJECT = "myday2-28db4";
 const ALLOWED_EMAILS = ["larsiveg@gmail.com", "thalkinrud@gmail.com"];
 const ALLOWED_ORIGINS = ["https://larsiveg-jpg.github.io", "http://localhost:8765"];
 const KASSAL = "https://kassal.app/api/v1";
-const STORE = /rema/i;              // Rema 1000
+const STORE_CODE = /^ODA/i;          // Oda (Kassalapp-kode ODA_NO)
+const STORE_NAME = /^oda$/i;
 const CACHE_SECONDS = 6 * 60 * 60;  // mellomlagre Kassalapp-svar i 6 timer
 const MAX_EANS = 30;
 
@@ -85,7 +86,7 @@ export default {
 /* ---------- Kassalapp ---------- */
 
 function isStore(store) {
-  return !!store && STORE.test(`${store.code || ""} ${store.name || ""}`);
+  return !!store && (STORE_CODE.test(store.code || "") || STORE_NAME.test((store.name || "").trim()));
 }
 function priceOf(cp) {
   if (cp == null) return null;
@@ -106,14 +107,14 @@ function simplify(p, price) {
   };
 }
 
-// null = finnes ikke hos Rema 1000, undefined (kastet) = feil
+// null = finnes ikke hos Oda, undefined (kastet) = feil
 async function lookupEan(ean, kassal) {
   const r = await kassal(`/products/ean/${ean}`);
   const data = r && r.data;
   if (!data || !Array.isArray(data.products)) return null;
   const hit = data.products.find(p => isStore(p.store) && priceOf(p.current_price) != null);
   if (hit) return simplify({ ...hit, ean: data.ean || ean }, priceOf(hit.current_price));
-  // Finnes, men ikke hos Rema: gi navn og bilde uten pris
+  // Finnes, men ikke hos Oda: gi navn og bilde uten pris
   const any = data.products[0];
   return any ? { ...simplify({ ...any, ean: data.ean || ean }, null), price: null } : null;
 }
