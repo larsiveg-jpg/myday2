@@ -3,7 +3,7 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPe
   from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot }
   from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
-import { firebaseConfig, enturClientName, priceApi } from "./config.js?v=20261104-6";
+import { firebaseConfig, enturClientName, priceApi } from "./config.js?v=20261104-7";
 
 /* ---------- Hjelpere ---------- */
 const $ = id => document.getElementById(id);
