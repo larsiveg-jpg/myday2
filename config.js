@@ -16,4 +16,4 @@ export const enturClientName = "larsiveg-myday2";
 
 // Adressen til prisstasjonen (Cloudflare Worker, se worker/ og README).
 // Tom streng = priser og strekkodeskanning er skjult i handlelista.
-export const priceApi = "";
+export const priceApi = "https://myday-priser.larsiveg.workers.dev";
