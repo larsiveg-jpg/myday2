@@ -3,7 +3,7 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPe
   from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot }
   from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
-import { firebaseConfig, enturClientName, priceApi } from "./config.js?v=20261104-3";
+import { firebaseConfig, enturClientName, priceApi } from "./config.js?v=20261104-4";
 
 /* ---------- Hjelpere ---------- */
 const $ = id => document.getElementById(id);
@@ -28,7 +28,6 @@ let selected = iso(today);
 let events = [], shop = [], stops = [], products = new Map();
 let me = null, unsubs = [];
 
-$("todayLbl").textContent = "Uke " + isoWeek(today);
 
 function setStatus(msg, color = "warning") {
   $("status").hidden = !msg; $("statusText").textContent = msg || "";
@@ -94,11 +93,11 @@ addEventListener("hashchange", showTab);
 function showLogin() {
   me = null; unsubs.forEach(u => u()); unsubs = [];
   tabs.forEach(n => { $("v-" + n).hidden = true; });
-  $("nav").hidden = true; $("signoutRow").hidden = true; $("v-login").hidden = false;
+  $("nav").hidden = true; $("signOut").hidden = true; $("v-login").hidden = false;
 }
 function showApp(user) {
   me = { uid: user.uid, name: user.displayName || (user.email || "").split("@")[0] };
-  $("v-login").hidden = true; $("nav").hidden = false; $("signoutRow").hidden = false;
+  $("v-login").hidden = true; $("nav").hidden = false; $("signOut").hidden = false;
   listen("events", a => events = a, () => { renderCal(); renderDay(); renderHome(); });
   listen("shopping", a => shop = a, () => { renderShop(); refreshPrices(); });
   if (pricesOn) unsubs.push(onSnapshot(collection(db, "products"), snap => {

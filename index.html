@@ -15,16 +15,16 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@digdir/designsystemet-css@1.23.0/dist/src/index.css">
-  <link rel="stylesheet" href="theme/myday.css?v=20261104-3">
-  <link rel="stylesheet" href="app.css?v=20261104-3">
+  <link rel="stylesheet" href="theme/myday.css?v=20261104-4">
+  <link rel="stylesheet" href="app.css?v=20261104-4">
   <script src="https://cdn.jsdelivr.net/npm/@digdir/designsystemet-web@1.23.0/dist/umd/index.js" defer></script>
-  <script type="module" src="app.js?v=20261104-3"></script>
+  <script type="module" src="app.js?v=20261104-4"></script>
 </head>
 <body>
 <div class="myday-wrap" data-color="accent">
   <header class="myday-header">
     <h1 class="ds-heading" data-size="md">MyDay 2.0</h1>
-    <p class="ds-paragraph" data-size="sm" data-variant="short" id="todayLbl"></p>
+    <button class="ds-button" type="button" data-variant="tertiary" data-size="sm" data-color="neutral" id="signOut" hidden>Logg ut</button>
   </header>
 
   <div class="ds-alert" data-color="warning" id="status" hidden>
@@ -169,9 +169,6 @@
     <p class="ds-paragraph myday-subtle" data-size="xs">Avgangsdata fra <a class="ds-link" href="https://entur.no" target="_blank" rel="noopener">Entur</a>. Oppdateres hvert 30. sekund.</p>
   </main>
 
-  <p class="myday-signout" id="signoutRow" hidden>
-    <button class="ds-button" type="button" data-variant="tertiary" data-size="sm" data-color="neutral" id="signOut">Logg ut</button>
-  </p>
 </div>
 
 <!-- Ny avtale: bunnark -->

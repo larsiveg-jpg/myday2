@@ -27,15 +27,13 @@
     position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
     background: var(--ds-color-neutral-background-default);
     padding-block: var(--ds-size-3) var(--ds-size-2);
-    display: flex; align-items: baseline; justify-content: space-between; gap: var(--ds-size-3);
+    display: flex; align-items: center; justify-content: space-between; gap: var(--ds-size-3);
   }
-  .myday-header .ds-paragraph { color: var(--ds-color-neutral-text-subtle); text-align: end; }
   .myday-view { display: grid; gap: var(--ds-size-4); }
   .myday-view > * { min-width: 0; }
   .myday-row { display: flex; align-items: center; justify-content: space-between; gap: var(--ds-size-2); }
   .myday-subtle { color: var(--ds-color-neutral-text-subtle); }
   .myday-cap { text-transform: capitalize; }
-  .myday-signout { display: flex; justify-content: center; margin: 0; }
 
   /* Kalender-rutenett */
   .myday-cal-card, .myday-flat {
