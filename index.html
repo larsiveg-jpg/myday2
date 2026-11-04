@@ -15,10 +15,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@digdir/designsystemet-css@1.23.0/dist/src/index.css">
-  <link rel="stylesheet" href="theme/myday.css?v=20261104-5">
-  <link rel="stylesheet" href="app.css?v=20261104-5">
+  <link rel="stylesheet" href="theme/myday.css?v=20261104-6">
+  <link rel="stylesheet" href="app.css?v=20261104-6">
   <script src="https://cdn.jsdelivr.net/npm/@digdir/designsystemet-web@1.23.0/dist/umd/index.js" defer></script>
-  <script type="module" src="app.js?v=20261104-5"></script>
+  <script type="module" src="app.js?v=20261104-6"></script>
 </head>
 <body>
 <div class="myday-wrap" data-color="accent">
@@ -173,15 +173,18 @@
   <main class="myday-view" id="v-reisetid" hidden>
     <div class="ds-card" data-color="brand1" data-variant="tinted">
       <div class="ds-card__block myday-form">
-        <ds-field class="ds-field">
-          <label for="rtFrom">Fra</label>
-          <select class="ds-input" id="rtFrom"></select>
-        </ds-field>
+        <div class="myday-trip-favs" id="rtFavs" role="group" aria-label="Favorittreiser" hidden></div>
         <div>
-          <ds-field class="ds-field">
-            <label for="rtTo">Til</label>
-            <input class="ds-input" type="search" id="rtTo" autocomplete="off" placeholder="Jernbanetorget">
-          </ds-field>
+          <div class="myday-trip-fields">
+            <ds-field class="ds-field">
+              <label for="rtFrom">Fra</label>
+              <select class="ds-input" id="rtFrom"></select>
+            </ds-field>
+            <ds-field class="ds-field">
+              <label for="rtTo">Til</label>
+              <input class="ds-input" type="search" id="rtTo" autocomplete="off" placeholder="Jernbanetorget">
+            </ds-field>
+          </div>
           <ul class="myday-results" id="rtToResults"></ul>
         </div>
         <fieldset class="ds-fieldset" id="rtLinesBox" hidden>
@@ -193,8 +196,12 @@
     </div>
     <section class="ds-card myday-flat" aria-labelledby="rtTitle">
       <div class="ds-card__block">
-        <h2 class="ds-heading" data-size="xs" id="rtTitle">Reisetid</h2>
+        <div class="myday-stop__head">
+          <h2 class="ds-heading myday-stop__name" data-size="xs" id="rtTitle">Reisetid</h2>
+          <button class="ds-button myday-fav" type="button" data-icon data-variant="tertiary" data-color="neutral" id="rtFavBtn" aria-pressed="false" aria-label="Lagre som favorittreise" hidden></button>
+        </div>
         <p class="ds-paragraph" data-size="sm" data-variant="short" id="rtSummary"></p>
+        <p class="ds-validation-message" data-color="info" id="rtFavMsg" hidden></p>
         <ul class="myday-departures" id="rtList" aria-live="polite"></ul>
         <p class="ds-paragraph myday-subtle" data-size="xs" id="rtUpdated"></p>
       </div>

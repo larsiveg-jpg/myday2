@@ -197,6 +197,13 @@
   /* Dialog-skjema */
   .myday-form { display: grid; gap: var(--ds-size-4); }
   .myday-chips { display: flex; flex-wrap: wrap; gap: var(--ds-size-2); }
+  .myday-trip-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ds-size-2); }
+  .myday-trip-fields .ds-input { min-width: 0; width: 100%; }
+  .myday-trip-favs { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: var(--ds-size-2); }
+  .myday-trip-favs .ds-button { justify-content: flex-start; text-align: start; white-space: normal; min-width: 0; }
+  .myday-trip-favs .ds-button svg { flex: none; }
+  .myday-trip-favs .ds-button span { min-width: 0; overflow-wrap: anywhere; }
+  .myday-trip-favs .ds-button[aria-pressed="true"] svg { fill: currentColor; }
   .myday-dates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ds-size-2) var(--ds-size-1); }
   .myday-dates .ds-input {
     min-width: 0; width: 100%;

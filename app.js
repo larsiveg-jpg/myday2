@@ -3,7 +3,7 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPe
   from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot }
   from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
-import { firebaseConfig, enturClientName, priceApi } from "./config.js?v=20261104-5";
+import { firebaseConfig, enturClientName, priceApi } from "./config.js?v=20261104-6";
 
 /* ---------- Hjelpere ---------- */
 const $ = id => document.getElementById(id);
@@ -779,6 +779,8 @@ async function searchStops(q) {
 const RT_KEY = "myday.reisetid";
 let rt = (() => { try { return JSON.parse(localStorage.getItem(RT_KEY)) || {}; } catch { return {}; } })();
 if (!Array.isArray(rt.lines)) rt.lines = [];
+if (!Array.isArray(rt.favs)) rt.favs = [];   // inntil to favorittreiser: { fromId, toId, toName, lines }
+const RT_MAX_FAVS = 2;
 const saveRt = () => { try { localStorage.setItem(RT_KEY, JSON.stringify(rt)); } catch {} };
 let rtData = null, rtBusy = false, rtSeq = 0;
 
@@ -861,11 +863,52 @@ function renderTravelFrom() {
 }
 $("rtFrom").addEventListener("change", e => { rt.fromId = e.target.value; rt.lines = []; saveRt(); rtData = null; renderTravel(); refreshTravel(); });
 
+/* Favorittreiser */
+const sameLines = (a, b) => a.length === b.length && a.every(x => b.includes(x));
+const tripName = id => (stops.find(s => s.enturId === id) || {}).name || "";
+function currentFavIndex() {
+  const fromId = rtFromId();
+  return rt.favs.findIndex(f => f.fromId === fromId && f.toId === rt.toId && sameLines(f.lines || [], rt.lines));
+}
+function openFav(f) {
+  rt.fromId = f.fromId; rt.toId = f.toId; rt.toName = f.toName; rt.lines = [...(f.lines || [])]; saveRt();
+  $("rtToResults").textContent = ""; $("rtFavMsg").hidden = true;
+  rtData = null; renderTravelFrom(); renderTravel(); refreshTravel();
+}
+function renderTravelFavs() {
+  const box = $("rtFavs"), cur = currentFavIndex();
+  box.textContent = ""; box.hidden = !rt.favs.length;
+  rt.favs.forEach((f, i) => {
+    const b = document.createElement("button"); b.type = "button"; b.className = "ds-button";
+    b.setAttribute("data-variant", i === cur ? "primary" : "secondary"); b.setAttribute("data-size", "sm");
+    b.setAttribute("aria-pressed", i === cur ? "true" : "false");
+    const codes = (f.lines || []).map(id => id.split(":").pop()).join(", ");
+    const label = document.createElement("span");
+    label.textContent = (tripName(f.fromId) || "?") + " → " + f.toName + (codes ? " (" + codes + ")" : "");
+    b.innerHTML = svg(ICON_STAR, 16); b.appendChild(label);
+    b.onclick = () => openFav(f);
+    box.appendChild(b);
+  });
+  const fb = $("rtFavBtn"), fromId = rtFromId();
+  fb.hidden = !(fromId && rt.toId);
+  fb.innerHTML = svg(ICON_STAR);
+  fb.setAttribute("aria-pressed", cur >= 0 ? "true" : "false");
+  fb.setAttribute("aria-label", cur >= 0 ? "Fjern fra favorittreiser" : "Lagre som favorittreise");
+}
+$("rtFavBtn").addEventListener("click", () => {
+  const cur = currentFavIndex(), msg = $("rtFavMsg");
+  if (cur >= 0) { rt.favs.splice(cur, 1); msg.hidden = true; }
+  else if (rt.favs.length >= RT_MAX_FAVS) { msg.textContent = "Du har allerede to favorittreiser. Åpne en av dem og trykk på stjernen for å fjerne den først."; msg.hidden = false; return; }
+  else { rt.favs.push({ fromId: rtFromId(), toId: rt.toId, toName: rt.toName, lines: [...rt.lines] }); msg.hidden = true; }
+  saveRt(); renderTravelFavs();
+});
+
 function renderTravel() {
   const fromId = rtFromId(), from = stops.find(s => s.enturId === fromId);
   const ul = $("rtList"), sum = $("rtSummary"), upd = $("rtUpdated"), box = $("rtLinesBox"), chips = $("rtLines");
   if (document.activeElement !== $("rtTo")) $("rtTo").value = rt.toName || "";
   $("rtTitle").textContent = from && rt.toName ? from.name + " → " + rt.toName : "Reisetid";
+  renderTravelFavs();
   ul.textContent = ""; sum.textContent = ""; upd.textContent = "";
   if (!fromId) { box.hidden = true; ul.appendChild(emptyLi("Lagre en holdeplass under Avganger, så kan du velge den her.")); return; }
   if (!rt.toId) { box.hidden = true; ul.appendChild(emptyLi("Velg hvor du skal, så vises kjøretid for avgangene som går dit.")); return; }
